@@ -342,19 +342,46 @@ export const getSectorPerformance = async (): Promise<SectorPerformance[]> => {
     }
 };
 
-// --- International Indices ---
+// --- International Indices (via Yahoo Finance for accuracy) ---
+
+const INTL_INDEX_SYMBOLS = ['^FCHI', '^GDAXI', '^FTSE', '^N225', '^HSI'];
+
+async function fetchYahooIndex(symbol: string): Promise<MarketIndex | null> {
+    try {
+        const encoded = encodeURIComponent(symbol);
+        const res = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1d`,
+            {
+                cache: 'no-store',
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+            }
+        );
+        if (!res.ok) return null;
+        const json = await res.json();
+        const meta = json.chart?.result?.[0]?.meta;
+        if (!meta) return null;
+
+        const price = meta.regularMarketPrice;
+        const prevClose = meta.chartPreviousClose;
+        const change = price - prevClose;
+        const changesPercentage = (change / prevClose) * 100;
+
+        return {
+            symbol: meta.symbol,
+            name: meta.longName || meta.shortName || symbol,
+            price,
+            changesPercentage,
+            change,
+        };
+    } catch {
+        return null;
+    }
+}
 
 export const getInternationalIndices = async (): Promise<MarketIndex[]> => {
     try {
-        const symbols = '%5EFCHI,%5EGDAXI,%5EFTSE,%5EN225,%5EHSI';
-        const data = await fetchFMP(`/quote/${symbols}`);
-        return data.map((item: any) => ({
-            symbol: item.symbol,
-            name: item.name,
-            price: item.price,
-            changesPercentage: item.changesPercentage,
-            change: item.change,
-        }));
+        const results = await Promise.all(INTL_INDEX_SYMBOLS.map(fetchYahooIndex));
+        return results.filter((r): r is MarketIndex => r !== null);
     } catch (error) {
         console.error('Error fetching international indices:', error);
         return [];

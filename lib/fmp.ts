@@ -307,17 +307,56 @@ export const getEconomicCalendar = async (from?: string, to?: string): Promise<E
     }
 };
 
-// --- Sector Performance ---
+// --- Sector Performance (via Sector ETFs for real-time accuracy) ---
+
+const SECTOR_ETFS: { symbol: string; sector: string }[] = [
+    { symbol: 'XLK', sector: 'Information Technology' },
+    { symbol: 'XLV', sector: 'Health Care' },
+    { symbol: 'XLF', sector: 'Financials' },
+    { symbol: 'XLE', sector: 'Energy' },
+    { symbol: 'XLY', sector: 'Consumer Cyclical' },
+    { symbol: 'XLP', sector: 'Consumer Defensive' },
+    { symbol: 'XLC', sector: 'Communication Services' },
+    { symbol: 'XLI', sector: 'Industrials' },
+    { symbol: 'XLB', sector: 'Materials' },
+    { symbol: 'XLRE', sector: 'Real Estate' },
+    { symbol: 'XLU', sector: 'Utilities' },
+];
 
 export const getSectorPerformance = async (): Promise<SectorPerformance[]> => {
     try {
-        const data = await fetchFMP('/sector-performance');
-        return data.map((item: any) => ({
-            sector: item.sector,
-            changesPercentage: item.changesPercentage,
-        }));
+        const symbols = SECTOR_ETFS.map(e => e.symbol).join(',');
+        const data = await fetchFMP(`/quote/${symbols}`);
+        return data.map((item: any) => {
+            const etf = SECTOR_ETFS.find(e => e.symbol === item.symbol);
+            return {
+                sector: etf?.sector || item.name,
+                changesPercentage: item.changesPercentage,
+                etfSymbol: item.symbol,
+                price: item.price,
+            };
+        });
     } catch (error) {
         console.error('Error fetching sector performance:', error);
+        return [];
+    }
+};
+
+// --- International Indices ---
+
+export const getInternationalIndices = async (): Promise<MarketIndex[]> => {
+    try {
+        const symbols = '%5EFCHI,%5EGDAXI,%5EFTSE,%5EN225,%5EHSI';
+        const data = await fetchFMP(`/quote/${symbols}`);
+        return data.map((item: any) => ({
+            symbol: item.symbol,
+            name: item.name,
+            price: item.price,
+            changesPercentage: item.changesPercentage,
+            change: item.change,
+        }));
+    } catch (error) {
+        console.error('Error fetching international indices:', error);
         return [];
     }
 };

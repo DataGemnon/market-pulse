@@ -115,7 +115,9 @@ export interface GeneralNewsArticle {
 
 export interface SectorPerformance {
   sector: string;
-  changesPercentage: string;
+  changesPercentage: number;
+  etfSymbol: string;
+  price: number;
 }
 
 export interface InsiderTrade {

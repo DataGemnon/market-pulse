@@ -61,11 +61,7 @@ export default function SectorHeatmap() {
     if (sectors.length === 0) return null;
 
     // Sort from best to worst performer
-    const sorted = [...sectors].sort((a, b) => {
-        const aVal = parseFloat(a.changesPercentage);
-        const bVal = parseFloat(b.changesPercentage);
-        return bVal - aVal;
-    });
+    const sorted = [...sectors].sort((a, b) => b.changesPercentage - a.changesPercentage);
 
     return (
         <div className="space-y-6">
@@ -81,7 +77,7 @@ export default function SectorHeatmap() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {sorted.map((sector, index) => {
-                    const pct = parseFloat(sector.changesPercentage);
+                    const pct = sector.changesPercentage;
                     const isPositive = pct >= 0;
                     const imageUrl = SECTOR_IMAGES[sector.sector] || FALLBACK_IMAGE;
 
@@ -103,10 +99,13 @@ export default function SectorHeatmap() {
                                 }`}
                             />
 
-                            {/* Rank badge */}
-                            <div className="absolute top-3 left-3">
+                            {/* Rank badge & ETF symbol */}
+                            <div className="absolute top-3 left-3 flex items-center gap-1.5">
                                 <span className="text-[10px] font-bold text-white/40 bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-md">
                                     #{index + 1}
+                                </span>
+                                <span className="text-[10px] font-bold text-white/30 bg-black/20 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
+                                    {sector.etfSymbol}
                                 </span>
                             </div>
 

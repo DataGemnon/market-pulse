@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
 import MarketOverview from '@/components/MarketOverview';
@@ -9,6 +11,7 @@ import MarketCommentaryFeed from '@/components/MarketCommentaryFeed';
 import { getMarketIndices } from '@/lib/fmp';
 
 import AnalystDiscovery from '@/components/AnalystDiscovery';
+import InternationalIndices from '@/components/InternationalIndices';
 
 export default async function Home() {
   const indices = await getMarketIndices();
@@ -28,6 +31,11 @@ export default async function Home() {
         <MarketOverview indices={indices} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+          {/* International Indices - smaller, below US overview */}
+          <div className="mb-12">
+            <InternationalIndices />
+          </div>
+
           {/* Sector Heatmap - prominent near top */}
           <div className="mb-16">
             <SectorHeatmap />

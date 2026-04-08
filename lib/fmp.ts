@@ -12,7 +12,7 @@ const fetchFMP = async (endpoint: string, params: Record<string, string> = {}) =
         throw new Error('API Key is missing');
     }
     const query = new URLSearchParams({ apikey: API_KEY, ...params }).toString();
-    const res = await fetch(`${BASE_URL}${endpoint}?${query}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${BASE_URL}${endpoint}?${query}`, { cache: 'no-store' });
 
     if (!res.ok) {
         let errorBody = '';

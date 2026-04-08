@@ -39,6 +39,10 @@ export default function SectorHeatmap() {
             }
         };
         load();
+
+        // Auto-refresh every 60 seconds
+        const interval = setInterval(load, 60_000);
+        return () => clearInterval(interval);
     }, []);
 
     if (loading) {

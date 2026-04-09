@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MarketIndex } from '@/types';
-import { getInternationalIndices } from '@/lib/fmp';
+import { getInternationalIndicesAction } from '@/actions/international-indices';
 import { Globe, TrendingUp, TrendingDown } from 'lucide-react';
 
 const INDEX_CONFIG: Record<string, { label: string; flag: string; image: string }> = {
@@ -40,7 +40,7 @@ export default function InternationalIndices() {
     useEffect(() => {
         const load = async () => {
             try {
-                const data = await getInternationalIndices();
+                const data = await getInternationalIndicesAction();
                 setIndices(data);
             } catch (e) {
                 console.error('Failed to load international indices', e);

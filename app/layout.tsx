@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MarketPulse — AI-Powered Market Intelligence",
+  title: "VEKTORA — AI-Powered Market Intelligence",
   description: "Real-time market insights, AI-powered analysis, and analyst tracking for the next generation of investors.",
 };
 

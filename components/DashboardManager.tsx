@@ -23,7 +23,7 @@ export default function DashboardManager() {
 
     // 1. Load Watchlist from LocalStorage on Mount
     useEffect(() => {
-        const stored = localStorage.getItem('market-pulse-watchlist');
+        const stored = localStorage.getItem('vektora-watchlist');
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
@@ -157,7 +157,7 @@ export default function DashboardManager() {
         fetchData();
 
         // Persist to local storage
-        localStorage.setItem('market-pulse-watchlist', JSON.stringify(watchlist));
+        localStorage.setItem('vektora-watchlist', JSON.stringify(watchlist));
 
     }, [watchlist]);
 

@@ -14,11 +14,11 @@ const Navbar = () => {
                                 <Activity size={22} />
                                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl -z-10" />
                             </div>
-                            <span className="font-black text-xl tracking-tight">
+                            <span className="font-black text-xl tracking-[0.15em] uppercase">
                                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-                                    Market
+                                    VEKT
                                 </span>
-                                <span className="text-white">Pulse</span>
+                                <span className="text-white">ORA</span>
                             </span>
                         </Link>
                     </div>

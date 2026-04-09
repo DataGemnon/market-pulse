@@ -43,10 +43,10 @@ const HeroSection = () => {
                         transition={{ duration: 0.6, delay: 0.1 }}
                         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-6 leading-[0.95]"
                     >
-                        <span className="text-white">Pulse of the</span>
+                        <span className="text-white">See Beyond the</span>
                         <br />
                         <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-                            Future Markets
+                            Market Noise
                         </span>
                     </motion.h1>
 

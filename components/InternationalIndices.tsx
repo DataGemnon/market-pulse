@@ -9,7 +9,7 @@ const INDEX_CONFIG: Record<string, { label: string; flag: string; image: string 
     '^FCHI': {
         label: 'CAC 40',
         flag: '🇫🇷',
-        image: 'https://images.unsplash.com/photo-1543349689-9a4d426bee8e?w=500&h=300&fit=crop&q=80',
+        image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=500&h=300&fit=crop&q=80',
     },
     '^GDAXI': {
         label: 'DAX',

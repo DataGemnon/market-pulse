@@ -1,4 +1,4 @@
-import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, UpgradeDowngrade } from '@/types';
+import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
@@ -479,57 +479,31 @@ export const getAnalystConsensus = async (symbol: string): Promise<AnalystConsen
     }
 };
 
-// --- Finnhub Upgrade/Downgrade (free tier, 60 calls/min) ---
+// --- Finnhub Recommendation Trends (free tier, 60 calls/min) ---
 
 const FINNHUB_KEY = process.env.FINNHUB_API_KEY || '';
 
-export const getUpgradesDowngrades = async (symbol: string, limit: number = 10): Promise<UpgradeDowngrade[]> => {
+export const getFinnhubRecommendation = async (symbol: string): Promise<AnalystConsensus[]> => {
     if (!FINNHUB_KEY) return [];
     try {
         const res = await fetch(
-            `https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${symbol}&token=${FINNHUB_KEY}`,
+            `https://finnhub.io/api/v1/stock/recommendation?symbol=${symbol}&token=${FINNHUB_KEY}`,
             { cache: 'no-store' }
         );
         if (!res.ok) return [];
         const data = await res.json();
-        return (data || []).slice(0, limit).map((item: any) => ({
+        if (data?.error) return [];
+        return (data || []).slice(0, 6).map((item: any) => ({
             symbol: item.symbol || symbol,
-            company: item.company || '',
-            fromGrade: item.fromGrade || '',
-            toGrade: item.toGrade || '',
-            action: item.action?.toLowerCase() === 'up' ? 'upgrade'
-                : item.action?.toLowerCase() === 'down' ? 'downgrade'
-                : item.action?.toLowerCase() === 'init' ? 'init'
-                : 'reiterated',
-            date: item.gradeTime?.split('T')[0] || '',
+            date: item.period || '',
+            strongBuy: item.strongBuy || 0,
+            buy: item.buy || 0,
+            hold: item.hold || 0,
+            sell: item.sell || 0,
+            strongSell: item.strongSell || 0,
         }));
     } catch (error) {
-        console.error(`Error fetching upgrades for ${symbol}:`, error);
-        return [];
-    }
-};
-
-export const getRecentUpgradesDowngrades = async (): Promise<UpgradeDowngrade[]> => {
-    if (!FINNHUB_KEY) return [];
-    try {
-        const results: UpgradeDowngrade[] = [];
-        for (const sym of DISCOVERY_SYMBOLS.slice(0, 20)) {
-            try {
-                const data = await getUpgradesDowngrades(sym, 3);
-                results.push(...data);
-            } catch { /* skip */ }
-            await new Promise(r => setTimeout(r, 100));
-        }
-        // Sort by date, filter to last 30 days
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        return results
-            .filter(r => r.action === 'upgrade' || r.action === 'downgrade' || r.action === 'init')
-            .filter(r => new Date(r.date) >= thirtyDaysAgo)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 15);
-    } catch (error) {
-        console.error('Error fetching recent upgrades/downgrades:', error);
+        console.error(`Error fetching Finnhub recommendation for ${symbol}:`, error);
         return [];
     }
 };

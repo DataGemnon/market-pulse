@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus } from '@/types';
-import { getStockQuote, getMarketNews, getAnalystConsensus } from '@/lib/fmp';
+import { getStockQuote, getMarketNews } from '@/lib/fmp';
+import { getWatchlistConsensusAction } from '@/actions/analyst';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -81,17 +82,8 @@ export default function DashboardManager() {
             setRecentNews(recent);
             setMissedNews(missed);
 
-            // Fetch Analyst Consensus for watchlist stocks
-            const consensusRes: AnalystConsensus[] = [];
-            for (const sym of watchlist) {
-                try {
-                    const data = await getAnalystConsensus(sym);
-                    if (data.length > 0) consensusRes.push(data[0]);
-                } catch (e) {
-                    console.error('Error fetching consensus for', sym, e);
-                }
-                await new Promise(r => setTimeout(r, 250));
-            }
+            // Fetch Analyst Consensus for watchlist stocks (via server action for Finnhub access)
+            const consensusRes = await getWatchlistConsensusAction(watchlist);
             setConsensus(consensusRes);
         };
 

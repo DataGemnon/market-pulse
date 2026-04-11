@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnalystConsensus, UpgradeDowngrade } from '@/types';
-import { getAnalystConsensusAction, getRecentUpgradesDowngradesAction } from '@/actions/analyst';
+import { AnalystConsensus } from '@/types';
+import { getAnalystConsensusAction } from '@/actions/analyst';
 import { Target, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react';
 
 interface ConsensusWithShift extends AnalystConsensus {
@@ -13,18 +13,13 @@ interface ConsensusWithShift extends AnalystConsensus {
 
 export default function AnalystDiscovery() {
     const [consensus, setConsensus] = useState<ConsensusWithShift[]>([]);
-    const [upgrades, setUpgrades] = useState<UpgradeDowngrade[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [consensusData, upgradesData] = await Promise.all([
-                    getAnalystConsensusAction(),
-                    getRecentUpgradesDowngradesAction(),
-                ]);
+                const consensusData = await getAnalystConsensusAction();
                 setConsensus(consensusData);
-                setUpgrades(upgradesData);
             } catch (e) {
                 console.error("Failed to load discovery data", e);
             } finally {
@@ -129,60 +124,6 @@ export default function AnalystDiscovery() {
                 </div>
             </div>
 
-            {/* Recent Upgrades/Downgrades from Finnhub */}
-            {upgrades.length > 0 && (
-                <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] relative overflow-hidden transition-all duration-500 hover:border-white/[0.1]">
-                    <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
-
-                    <div className="p-6 sm:p-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                                <TrendingUp className="w-5 h-5 text-emerald-400" />
-                                Recent Rating Changes
-                            </h3>
-                            <span className="text-[11px] font-bold px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-full border border-purple-500/20 uppercase tracking-wider">
-                                Last 30 days
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {upgrades.slice(0, 10).map((u, i) => {
-                                const isUpgrade = u.action === 'upgrade';
-                                const isDowngrade = u.action === 'downgrade';
-                                return (
-                                    <div key={i} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] rounded-xl border border-white/[0.04] hover:border-white/[0.08] transition-all duration-300">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className={`p-1.5 rounded-lg ${isUpgrade ? 'bg-emerald-500/10 text-emerald-400' : isDowngrade ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
-                                                    {isUpgrade ? <TrendingUp size={14} /> : isDowngrade ? <TrendingDown size={14} /> : <Sparkles size={14} />}
-                                                </div>
-                                                <span className="text-base font-bold text-white">{u.symbol}</span>
-                                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-white/[0.05] px-2 py-0.5 rounded truncate max-w-[140px]">
-                                                    {u.company}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm mt-1.5 flex items-center gap-2 pl-9">
-                                                {u.fromGrade && (
-                                                    <>
-                                                        <span className="text-slate-500 text-xs">{u.fromGrade}</span>
-                                                        <span className="text-slate-600">→</span>
-                                                    </>
-                                                )}
-                                                <span className={`font-bold text-xs ${isUpgrade ? 'text-emerald-400' : isDowngrade ? 'text-red-400' : 'text-cyan-400'}`}>
-                                                    {u.toGrade}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="text-[11px] font-medium text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-lg flex-shrink-0 ml-3">
-                                            {new Date(u.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

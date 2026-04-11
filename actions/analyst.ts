@@ -1,19 +1,45 @@
 'use server';
 
-import { getAnalystConsensus, getRecentUpgradesDowngrades, getDiscoveryStocks } from '@/lib/fmp';
-import { UpgradeDowngrade } from '@/types';
+import { getAnalystConsensus, getFinnhubRecommendation, getDiscoveryStocks } from '@/lib/fmp';
+import { AnalystConsensus } from '@/types';
 
-interface ConsensusWithShift {
-    symbol: string;
-    date: string;
-    strongBuy: number;
-    buy: number;
-    hold: number;
-    sell: number;
-    strongSell: number;
+interface ConsensusWithShift extends AnalystConsensus {
     buyShift: number;
     totalAnalysts: number;
     bullPercent: number;
+}
+
+async function getConsensusForSymbol(sym: string): Promise<AnalystConsensus[]> {
+    // Try Finnhub first (more detailed data), fallback to FMP
+    const finnhub = await getFinnhubRecommendation(sym);
+    if (finnhub.length >= 2) return finnhub;
+    const fmp = await getAnalystConsensus(sym);
+    if (fmp.length >= 1) return fmp;
+    return finnhub.length > 0 ? finnhub : [];
+}
+
+function computeShift(data: AnalystConsensus[]): ConsensusWithShift | null {
+    if (data.length === 0) return null;
+
+    const current = data[0];
+    const totalAnalysts = current.strongBuy + current.buy + current.hold + current.sell + current.strongSell;
+    if (totalAnalysts === 0) return null;
+
+    const currentBulls = current.strongBuy + current.buy;
+    let buyShift = 0;
+
+    if (data.length >= 2) {
+        const previous = data[1];
+        const previousBulls = previous.strongBuy + previous.buy;
+        buyShift = currentBulls - previousBulls;
+    }
+
+    return {
+        ...current,
+        buyShift,
+        totalAnalysts,
+        bullPercent: Math.round((currentBulls / totalAnalysts) * 100),
+    };
 }
 
 export async function getAnalystConsensusAction(): Promise<ConsensusWithShift[]> {
@@ -22,36 +48,9 @@ export async function getAnalystConsensusAction(): Promise<ConsensusWithShift[]>
 
     for (const sym of symbols) {
         try {
-            const data = await getAnalystConsensus(sym);
-            if (data.length >= 2) {
-                const current = data[0];
-                const previous = data[1];
-
-                const currentBulls = current.strongBuy + current.buy;
-                const previousBulls = previous.strongBuy + previous.buy;
-                const totalAnalysts = current.strongBuy + current.buy + current.hold + current.sell + current.strongSell;
-
-                if (totalAnalysts === 0) continue;
-
-                results.push({
-                    ...current,
-                    buyShift: currentBulls - previousBulls,
-                    totalAnalysts,
-                    bullPercent: Math.round((currentBulls / totalAnalysts) * 100),
-                });
-            } else if (data.length === 1) {
-                const current = data[0];
-                const totalAnalysts = current.strongBuy + current.buy + current.hold + current.sell + current.strongSell;
-                if (totalAnalysts === 0) continue;
-                const currentBulls = current.strongBuy + current.buy;
-
-                results.push({
-                    ...current,
-                    buyShift: 0,
-                    totalAnalysts,
-                    bullPercent: Math.round((currentBulls / totalAnalysts) * 100),
-                });
-            }
+            const data = await getConsensusForSymbol(sym);
+            const result = computeShift(data);
+            if (result) results.push(result);
         } catch {
             // skip symbol
         }
@@ -67,6 +66,16 @@ export async function getAnalystConsensusAction(): Promise<ConsensusWithShift[]>
     });
 }
 
-export async function getRecentUpgradesDowngradesAction(): Promise<UpgradeDowngrade[]> {
-    return getRecentUpgradesDowngrades();
+export async function getWatchlistConsensusAction(watchlist: string[]): Promise<AnalystConsensus[]> {
+    const results: AnalystConsensus[] = [];
+    for (const sym of watchlist) {
+        try {
+            const data = await getConsensusForSymbol(sym);
+            if (data.length > 0) results.push(data[0]);
+        } catch {
+            // skip
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    return results;
 }

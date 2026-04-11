@@ -159,13 +159,13 @@ export interface AnalystConsensus {
   strongSell: number;
 }
 
-export interface UpgradeDowngrade {
+export interface RatingChange {
   symbol: string;
-  company: string;
-  fromGrade: string;
-  toGrade: string;
-  action: 'upgrade' | 'downgrade' | 'init' | 'reiterated';
   date: string;
+  gradingCompany: string;
+  previousGrade: string;
+  newGrade: string;
+  action: 'upgrade' | 'downgrade';
 }
 
 export interface MarketCommentary {

@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus } from '@/types';
+import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange } from '@/types';
 import { getStockQuote, getMarketNews } from '@/lib/fmp';
-import { getWatchlistConsensusAction } from '@/actions/analyst';
+import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import InsiderTradingTracker from '@/components/InsiderTradingTracker';
+import { TrendingUp, TrendingDown, Bell, X } from 'lucide-react';
 
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
 
@@ -21,6 +22,8 @@ export default function DashboardManager() {
 
     // Intelligence Hub State
     const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
+    const [ratingAlerts, setRatingAlerts] = useState<RatingChange[]>([]);
+    const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
     // 1. Load Watchlist from LocalStorage on Mount
     useEffect(() => {
@@ -39,6 +42,14 @@ export default function DashboardManager() {
         } else {
             setWatchlist(DEFAULT_WATCHLIST);
         }
+
+        // Load dismissed alerts
+        const dismissed = localStorage.getItem('vektora-dismissed-alerts');
+        if (dismissed) {
+            try {
+                setDismissedAlerts(new Set(JSON.parse(dismissed)));
+            } catch { /* ignore */ }
+        }
     }, []);
 
     // 2. Fetch Data when Watchlist Changes
@@ -55,13 +66,12 @@ export default function DashboardManager() {
                 } catch (e) {
                     console.error('Error fetching quote for', sym, e);
                 }
-                // Small delay to prevent rate limiting
                 await new Promise(r => setTimeout(r, 250));
             }
             setQuotes(validQuotes);
 
             // Fetch News (filtered by watchlist)
-            const newsResults = await getMarketNews(50, watchlist); // Fetch more to allow splitting
+            const newsResults = await getMarketNews(50, watchlist);
 
             const now = new Date();
             const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -82,9 +92,13 @@ export default function DashboardManager() {
             setRecentNews(recent);
             setMissedNews(missed);
 
-            // Fetch Analyst Consensus for watchlist stocks (via server action for Finnhub access)
-            const consensusRes = await getWatchlistConsensusAction(watchlist);
+            // Fetch Analyst Consensus + Rating Changes for watchlist
+            const [consensusRes, ratingChanges] = await Promise.all([
+                getWatchlistConsensusAction(watchlist),
+                getWatchlistRatingChangesAction(watchlist),
+            ]);
             setConsensus(consensusRes);
+            setRatingAlerts(ratingChanges);
         };
 
         fetchData();
@@ -98,7 +112,6 @@ export default function DashboardManager() {
         const upper = symbol.toUpperCase();
         if (watchlist.includes(upper)) return;
 
-        // Validate symbol exists by trying to fetch quote
         try {
             await getStockQuote(upper);
             const newWatchlist = [...watchlist, upper];
@@ -113,6 +126,13 @@ export default function DashboardManager() {
         setWatchlist(newWatchlist);
     };
 
+    const handleDismissAlert = (alertKey: string) => {
+        const updated = new Set(dismissedAlerts);
+        updated.add(alertKey);
+        setDismissedAlerts(updated);
+        localStorage.setItem('vektora-dismissed-alerts', JSON.stringify([...updated]));
+    };
+
     // Transform quotes to WatchlistItems
     const watchlistItems: WatchlistItem[] = quotes.map(q => ({
         symbol: q.symbol,
@@ -121,6 +141,14 @@ export default function DashboardManager() {
         changesPercentage: q.changesPercentage,
         volume: q.volume
     }));
+
+    // Filter undismissed alerts (last 7 days only)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const activeAlerts = ratingAlerts.filter(a => {
+        const key = `${a.symbol}-${a.date}-${a.gradingCompany}`;
+        return !dismissedAlerts.has(key) && new Date(a.date) >= sevenDaysAgo;
+    });
 
     return (
         <div className="relative">
@@ -131,6 +159,57 @@ export default function DashboardManager() {
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-500">Your Dashboard</h2>
                     <div className="h-px flex-1 bg-gradient-to-l from-white/10 to-transparent" />
                 </div>
+
+                {/* Rating Change Alerts */}
+                {activeAlerts.length > 0 && (
+                    <div className="space-y-2">
+                        {activeAlerts.map((alert, i) => {
+                            const isUpgrade = alert.action === 'upgrade';
+                            const alertKey = `${alert.symbol}-${alert.date}-${alert.gradingCompany}`;
+                            return (
+                                <div
+                                    key={i}
+                                    className={`flex items-center gap-3 p-4 rounded-xl border backdrop-blur-sm animate-in fade-in slide-in-from-top-2 ${
+                                        isUpgrade
+                                            ? 'bg-emerald-500/[0.08] border-emerald-500/20'
+                                            : 'bg-red-500/[0.08] border-red-500/20'
+                                    }`}
+                                >
+                                    <div className={`p-2 rounded-lg flex-shrink-0 ${isUpgrade ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                                        <Bell size={16} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${isUpgrade ? 'text-emerald-400 bg-emerald-500/15' : 'text-red-400 bg-red-500/15'}`}>
+                                                {isUpgrade ? 'Upgrade' : 'Downgrade'}
+                                            </span>
+                                            <span className="text-xs text-slate-500">
+                                                {new Date(alert.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-white">
+                                            <span className="font-bold">{alert.gradingCompany}</span>
+                                            {isUpgrade ? ' upgrades ' : ' downgrades '}
+                                            <span className="font-bold">{alert.symbol}</span>
+                                            {' from '}
+                                            <span className="text-slate-400">{alert.previousGrade}</span>
+                                            {' to '}
+                                            <span className={`font-bold ${isUpgrade ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {alert.newGrade}
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleDismissAlert(alertKey)}
+                                        className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {/* Top: Watchlist */}
                 <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden">

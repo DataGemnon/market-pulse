@@ -1,4 +1,4 @@
-import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus } from '@/types';
+import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, RatingChange } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
@@ -477,6 +477,58 @@ export const getAnalystConsensus = async (symbol: string): Promise<AnalystConsen
         console.error(`Error fetching analyst consensus for ${symbol}:`, error);
         return [];
     }
+};
+
+// --- Rating Changes (actual upgrades/downgrades from FMP /grade/) ---
+
+const BULLISH_GRADES = ['buy', 'outperform', 'overweight', 'strong buy', 'positive', 'sector outperform'];
+const BEARISH_GRADES = ['sell', 'underperform', 'underweight', 'strong sell', 'negative', 'reduce'];
+
+function classifyGradeChange(from: string, to: string): 'upgrade' | 'downgrade' | null {
+    const fromLower = from.toLowerCase();
+    const toLower = to.toLowerCase();
+    const fromBull = BULLISH_GRADES.some(g => fromLower.includes(g));
+    const fromBear = BEARISH_GRADES.some(g => fromLower.includes(g));
+    const toBull = BULLISH_GRADES.some(g => toLower.includes(g));
+    const toBear = BEARISH_GRADES.some(g => toLower.includes(g));
+
+    if (toBull && !fromBull) return 'upgrade';
+    if (toBear && !fromBear) return 'downgrade';
+    if (!toBull && !toBear && fromBull) return 'downgrade';
+    if (!toBull && !toBear && fromBear) return 'upgrade';
+    return null;
+}
+
+export const getRecentRatingChanges = async (symbols?: string[]): Promise<RatingChange[]> => {
+    const targetSymbols = symbols || DISCOVERY_SYMBOLS;
+    const results: RatingChange[] = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    for (const sym of targetSymbols) {
+        try {
+            const data = await fetchFMP(`/grade/${sym}`, { limit: '15' });
+            for (const item of data) {
+                if (!item.previousGrade || item.previousGrade === item.newGrade) continue;
+                if (new Date(item.date) < thirtyDaysAgo) continue;
+
+                const action = classifyGradeChange(item.previousGrade, item.newGrade);
+                if (!action) continue;
+
+                results.push({
+                    symbol: item.symbol,
+                    date: item.date,
+                    gradingCompany: item.gradingCompany,
+                    previousGrade: item.previousGrade,
+                    newGrade: item.newGrade,
+                    action,
+                });
+            }
+        } catch { /* skip */ }
+        await new Promise(r => setTimeout(r, 100));
+    }
+
+    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
 // --- Finnhub Recommendation Trends (free tier, 60 calls/min) ---

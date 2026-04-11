@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { StockQuote, NewsArticle, WatchlistItem, AnalystRating } from '@/types';
-import { getStockQuote, getMarketNews, getAnalystRatings } from '@/lib/fmp';
+import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus } from '@/types';
+import { getStockQuote, getMarketNews, getAnalystConsensus } from '@/lib/fmp';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -19,7 +19,7 @@ export default function DashboardManager() {
     const [quotes, setQuotes] = useState<StockQuote[]>([]);
 
     // Intelligence Hub State
-    const [ratings, setRatings] = useState<AnalystRating[]>([]);
+    const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
 
     // 1. Load Watchlist from LocalStorage on Mount
     useEffect(() => {
@@ -81,77 +81,18 @@ export default function DashboardManager() {
             setRecentNews(recent);
             setMissedNews(missed);
 
-            // Fetch Intelligence Data (Ratings) sequentially
-            const ratingsRes = [];
+            // Fetch Analyst Consensus for watchlist stocks
+            const consensusRes: AnalystConsensus[] = [];
             for (const sym of watchlist) {
                 try {
-                    const r = await getAnalystRatings(sym);
-                    if (r && r.length > 0) ratingsRes.push(r);
+                    const data = await getAnalystConsensus(sym);
+                    if (data.length > 0) consensusRes.push(data[0]);
                 } catch (e) {
-                    console.error('Error fetching ratings for', sym, e);
+                    console.error('Error fetching consensus for', sym, e);
                 }
                 await new Promise(r => setTimeout(r, 250));
             }
-
-            // Filter Ratings: Only show Upgrades/Downgrades from top tier brokers
-            const threeDaysAgo = new Date();
-            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-
-            // Strict list of allowed top-tier brokers
-            const MAJOR_BROKERS = [
-                'morgan stanley',
-                'goldman sachs',
-                'jp morgan',
-                'jpmorgan',
-                'bank of america',
-                'bofa securities',
-                'bofa',
-                'citigroup',
-                'citi ',
-                'ubs',
-                'barclays',
-                'wells fargo',
-                'jefferies',
-                'rbc capital',
-                'credit suisse',
-                'deutsche bank',
-                'guggenheim',
-                'evercore',
-                'oppenheimer',
-                'baird',
-                'piper sandler',
-                'cantor fitzgerald',
-                'needham',
-                'keybanc',
-                'wedbush',
-                'mizuho',
-                'stifel',
-                'truist',
-                'raymond james',
-                'td cowen',
-                'macquarie',
-                'nomura'
-            ];
-
-            const filteredRatings = ratingsRes.flat().filter(r => {
-                const rDate = new Date(r.date);
-                const isGradeChange = r.previousGrade && r.newGrade !== r.previousGrade;
-                const isRecent = rDate >= threeDaysAgo;
-
-                if (!isGradeChange || !isRecent) return false;
-
-                const companyName = r.gradingCompany?.toLowerCase() || '';
-
-                // Explicitly exclude known small research firms that sometimes slip through
-                const blacklistedMatches = ['freedom', 'argus', 'telsey', 'craig-hallum', 'b. riley', 'maxim', 'hc wainwright'];
-                if (blacklistedMatches.some(bad => companyName.includes(bad))) {
-                    return false;
-                }
-
-                return MAJOR_BROKERS.some(broker => companyName.includes(broker));
-            }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-            setRatings(filteredRatings);
+            setConsensus(consensusRes);
         };
 
         fetchData();
@@ -222,7 +163,7 @@ export default function DashboardManager() {
                         <MarketBriefing news={recentNews} />
 
                         <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-white/[0.1]">
-                            <AnalystFeed ratings={ratings} />
+                            <AnalystFeed consensus={consensus} />
                         </div>
 
                         <InsiderTradingTracker watchlist={watchlist} />

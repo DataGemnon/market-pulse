@@ -149,6 +149,25 @@ export interface CongressionalTrade {
   symbol: string;
 }
 
+export interface AnalystConsensus {
+  symbol: string;
+  date: string;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+}
+
+export interface UpgradeDowngrade {
+  symbol: string;
+  company: string;
+  fromGrade: string;
+  toGrade: string;
+  action: 'upgrade' | 'downgrade' | 'init' | 'reiterated';
+  date: string;
+}
+
 export interface MarketCommentary {
   personName: string;
   personTitle: string;

@@ -28,6 +28,7 @@ const envVars = loadEnvLocal();
 const nextConfig: NextConfig = {
   env: {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || envVars.ANTHROPIC_API_KEY || '',
+    FINNHUB_API_KEY: process.env.FINNHUB_API_KEY || envVars.FINNHUB_API_KEY || '',
   },
 };
 

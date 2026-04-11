@@ -1,4 +1,4 @@
-import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade } from '@/types';
+import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, UpgradeDowngrade } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
@@ -437,7 +437,7 @@ export const getCongressionalTrades = async (limit: number = 30): Promise<Congre
     }
 };
 
-// --- Market Discovery Features ---
+// --- Discovery stock universe ---
 
 const DISCOVERY_SYMBOLS = [
     // Tech & Semis
@@ -458,6 +458,83 @@ const DISCOVERY_SYMBOLS = [
     // Telecom & Media
     'VZ', 'T', 'NFLX', 'DIS'
 ];
+
+// --- Analyst Consensus (monthly buy/hold/sell counts) ---
+
+export const getAnalystConsensus = async (symbol: string): Promise<AnalystConsensus[]> => {
+    try {
+        const data = await fetchFMP(`/analyst-stock-recommendations/${symbol}`);
+        return data.slice(0, 6).map((item: any) => ({
+            symbol: item.symbol,
+            date: item.date,
+            strongBuy: item.analystRatingsStrongBuy || 0,
+            buy: item.analystRatingsbuy || 0,
+            hold: item.analystRatingsHold || 0,
+            sell: item.analystRatingsSell || 0,
+            strongSell: item.analystRatingsStrongSell || 0,
+        }));
+    } catch (error) {
+        console.error(`Error fetching analyst consensus for ${symbol}:`, error);
+        return [];
+    }
+};
+
+// --- Finnhub Upgrade/Downgrade (free tier, 60 calls/min) ---
+
+const FINNHUB_KEY = process.env.FINNHUB_API_KEY || '';
+
+export const getUpgradesDowngrades = async (symbol: string, limit: number = 10): Promise<UpgradeDowngrade[]> => {
+    if (!FINNHUB_KEY) return [];
+    try {
+        const res = await fetch(
+            `https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${symbol}&token=${FINNHUB_KEY}`,
+            { cache: 'no-store' }
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data || []).slice(0, limit).map((item: any) => ({
+            symbol: item.symbol || symbol,
+            company: item.company || '',
+            fromGrade: item.fromGrade || '',
+            toGrade: item.toGrade || '',
+            action: item.action?.toLowerCase() === 'up' ? 'upgrade'
+                : item.action?.toLowerCase() === 'down' ? 'downgrade'
+                : item.action?.toLowerCase() === 'init' ? 'init'
+                : 'reiterated',
+            date: item.gradeTime?.split('T')[0] || '',
+        }));
+    } catch (error) {
+        console.error(`Error fetching upgrades for ${symbol}:`, error);
+        return [];
+    }
+};
+
+export const getRecentUpgradesDowngrades = async (): Promise<UpgradeDowngrade[]> => {
+    if (!FINNHUB_KEY) return [];
+    try {
+        const results: UpgradeDowngrade[] = [];
+        for (const sym of DISCOVERY_SYMBOLS.slice(0, 20)) {
+            try {
+                const data = await getUpgradesDowngrades(sym, 3);
+                results.push(...data);
+            } catch { /* skip */ }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        // Sort by date, filter to last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return results
+            .filter(r => r.action === 'upgrade' || r.action === 'downgrade' || r.action === 'init')
+            .filter(r => new Date(r.date) >= thirtyDaysAgo)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, 15);
+    } catch (error) {
+        console.error('Error fetching recent upgrades/downgrades:', error);
+        return [];
+    }
+};
+
+// --- Market Discovery Features ---
 
 export const getDiscoveryStocks = () => DISCOVERY_SYMBOLS;
 

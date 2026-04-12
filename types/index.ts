@@ -161,6 +161,7 @@ export interface AnalystConsensus {
 
 export interface RatingChange {
   symbol: string;
+  companyName: string;
   date: string;
   gradingCompany: string;
   previousGrade: string;

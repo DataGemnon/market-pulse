@@ -190,7 +190,7 @@ export default function DashboardManager() {
                                         <p className="text-sm text-white">
                                             <span className="font-bold">{alert.gradingCompany}</span>
                                             {isUpgrade ? ' upgrades ' : ' downgrades '}
-                                            <span className="font-bold">{alert.symbol}</span>
+                                            <span className="font-bold">{alert.companyName || alert.symbol}</span>
                                             {' from '}
                                             <span className="text-slate-400">{alert.previousGrade}</span>
                                             {' to '}

@@ -505,6 +505,16 @@ export const getRecentRatingChanges = async (symbols?: string[]): Promise<Rating
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // Batch-fetch company names for all symbols in one go
+    const nameMap: Record<string, string> = {};
+    try {
+        const allSymbols = targetSymbols.join(',');
+        const quotes = await fetchFMP(`/quote/${allSymbols}`);
+        for (const q of quotes) {
+            nameMap[q.symbol] = q.name || q.symbol;
+        }
+    } catch { /* fallback to symbol as name */ }
+
     for (const sym of targetSymbols) {
         try {
             const data = await fetchFMP(`/grade/${sym}`, { limit: '15' });
@@ -517,6 +527,7 @@ export const getRecentRatingChanges = async (symbols?: string[]): Promise<Rating
 
                 results.push({
                     symbol: item.symbol,
+                    companyName: nameMap[item.symbol] || item.symbol,
                     date: item.date,
                     gradingCompany: item.gradingCompany,
                     previousGrade: item.previousGrade,

@@ -95,7 +95,7 @@ export default function AnalystDiscovery() {
                                                 <div className={`p-1.5 rounded-lg ${isUpgrade ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                                                     {isUpgrade ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                                 </div>
-                                                <span className="text-base font-bold text-white">{c.symbol}</span>
+                                                <span className="text-base font-bold text-white">{c.companyName}</span>
                                                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isUpgrade ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}>
                                                     {c.action}
                                                 </span>
@@ -108,6 +108,7 @@ export default function AnalystDiscovery() {
                                                 <span className={`font-bold ${isUpgrade ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     {c.newGrade}
                                                 </span>
+                                                <span className="text-[10px] text-slate-600 ml-2">({c.symbol})</span>
                                             </div>
                                         </div>
                                         <div className="text-[11px] font-medium text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-lg flex-shrink-0 ml-3">

@@ -416,8 +416,15 @@ export const getInsiderTrading = async (symbol: string, limit: number = 10): Pro
 
 export const getCongressionalTrades = async (limit: number = 30): Promise<CongressionalTrade[]> => {
     try {
-        const data = await fetchFMP('/senate-trading', { limit: limit.toString() });
-        return data.map((item: any) => ({
+        // v4 RSS feed has current data; v3 /senate-trading is often empty
+        if (!API_KEY) throw new Error('API Key is missing');
+        const res = await fetch(
+            `https://financialmodelingprep.com/api/v4/senate-trading-rss-feed?page=0&apikey=${API_KEY}`,
+            { cache: 'no-store' }
+        );
+        if (!res.ok) throw new Error(`FMP v4 Error: ${res.status}`);
+        const data = await res.json();
+        return data.slice(0, limit).map((item: any) => ({
             firstName: item.firstName,
             lastName: item.lastName,
             office: item.office,

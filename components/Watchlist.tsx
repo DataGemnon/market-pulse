@@ -1,8 +1,10 @@
 'use client';
 
 import { WatchlistItem } from '@/types';
-import { Plus, TrendingUp, TrendingDown, Trash2, X, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, TrendingUp, TrendingDown, Trash2, X, Check, ChevronDown } from 'lucide-react';
+import { Fragment, useState } from 'react';
+import Sparkline from '@/components/Sparkline';
+import StockChart from '@/components/StockChart';
 
 function getCurrencySymbol(currency?: string): string {
     const c = currency || 'USD';
@@ -28,6 +30,7 @@ interface WatchlistProps {
 const Watchlist = ({ items, onAddSymbol, onRemoveSymbol }: WatchlistProps) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newSymbol, setNewSymbol] = useState('');
+    const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,6 +84,7 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol }: WatchlistProps) => {
                     <thead>
                         <tr className="border-b border-white/[0.06]">
                             <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Asset</th>
+                            <th className="px-5 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">5D</th>
                             <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price</th>
                             <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Change</th>
                             <th className="px-5 py-3 w-12"></th>
@@ -89,43 +93,64 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol }: WatchlistProps) => {
                     <tbody>
                         {items.map((item) => {
                             const isPositive = item.changesPercentage >= 0;
+                            const isExpanded = expandedSymbol === item.symbol;
                             return (
-                                <tr key={item.symbol} className="group border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                            <div className="h-9 w-9 flex-shrink-0 rounded-lg bg-gradient-to-br from-cyan-500/15 to-purple-500/15 border border-white/[0.06] flex items-center justify-center font-bold text-xs text-cyan-400">
-                                                {item.symbol.slice(0, 2)}
+                                <Fragment key={item.symbol}>
+                                    <tr
+                                        className="group border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors cursor-pointer"
+                                        onClick={() => setExpandedSymbol(isExpanded ? null : item.symbol)}
+                                    >
+                                        <td className="px-5 py-4 whitespace-nowrap">
+                                            <div className="flex items-center">
+                                                <div className="h-9 w-9 flex-shrink-0 rounded-lg bg-gradient-to-br from-cyan-500/15 to-purple-500/15 border border-white/[0.06] flex items-center justify-center font-bold text-xs text-cyan-400">
+                                                    {item.symbol.slice(0, 2)}
+                                                </div>
+                                                <div className="ml-3">
+                                                    <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                                                        {item.symbol}
+                                                        <ChevronDown size={12} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 truncate max-w-[100px]">{item.name}</div>
+                                                </div>
                                             </div>
-                                            <div className="ml-3">
-                                                <div className="text-sm font-bold text-white">{item.symbol}</div>
-                                                <div className="text-xs text-slate-500 truncate max-w-[100px]">{item.name}</div>
+                                        </td>
+                                        <td className="px-5 py-4 whitespace-nowrap hidden sm:table-cell">
+                                            <div className="flex justify-center">
+                                                <Sparkline symbol={item.symbol} isPositive={isPositive} />
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                        <div className="text-sm font-semibold text-white tabular-nums">
-                                            {getCurrencySymbol(item.currency)}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${isPositive
-                                            ? 'text-emerald-400 bg-emerald-500/10'
-                                            : 'text-red-400 bg-red-500/10'
-                                            }`}>
-                                            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                            {isPositive ? '+' : ''}{item.changesPercentage.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                        <button
-                                            onClick={() => onRemoveSymbol(item.symbol)}
-                                            className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Remove"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td className="px-5 py-4 whitespace-nowrap text-right">
+                                            <div className="text-sm font-semibold text-white tabular-nums">
+                                                {getCurrencySymbol(item.currency)}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-4 whitespace-nowrap text-right">
+                                            <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${isPositive
+                                                ? 'text-emerald-400 bg-emerald-500/10'
+                                                : 'text-red-400 bg-red-500/10'
+                                                }`}>
+                                                {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                                {isPositive ? '+' : ''}{item.changesPercentage.toFixed(2)}%
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-4 whitespace-nowrap text-right">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onRemoveSymbol(item.symbol); }}
+                                                className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                                title="Remove"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr className="border-b border-white/[0.03]">
+                                            <td colSpan={5} className="bg-white/[0.01]">
+                                                <StockChart symbol={item.symbol} isPositive={isPositive} currency={item.currency} />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
                             );
                         })}
                     </tbody>

@@ -63,7 +63,7 @@ const StockDetail = ({ quote, historicalData }: StockDetailProps) => {
 
             {/* Chart */}
             <div className="mb-8 border-b border-gray-100 pb-8">
-                <StockChart data={historicalData} color={isPositive ? '#16a34a' : '#dc2626'} />
+                <StockChart symbol={quote.symbol} isPositive={isPositive} />
                 <div className="mt-2 text-xs text-gray-400 text-left pl-2">${quote.dayLow}</div>
             </div>
 

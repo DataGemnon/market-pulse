@@ -193,44 +193,97 @@ export const getMarketNews = async (limit: number = 20, tickers?: string[]): Pro
 };
 
 export const getHistoricalChart = async (symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'): Promise<HistoricalPrice[]> => {
-    try {
-        let endpoint = `/historical-chart/1hour/${symbol}`; // default for shorter ranges
-        // FMP ranges: 1min, 5min, 15min, 30min, 1hour, 4hour
-        // For daily data: /historical-price-full/${symbol}
+    // Non-US symbols use Yahoo Finance exclusively
+    if (isNonUSSymbol(symbol)) {
+        return getYahooHistorical(symbol, range);
+    }
 
-        // Mapping range to FMP logic
+    // US: try FMP, fall back to Yahoo
+    try {
+        let endpoint: string;
         if (range === '1D') {
-            // 1D usually requires intraday. 
             endpoint = `/historical-chart/5min/${symbol}`;
-        } else if (range === '1W' || range === '1M') {
+        } else if (range === '1W') {
+            endpoint = `/historical-chart/30min/${symbol}`;
+        } else if (range === '1M') {
             endpoint = `/historical-chart/1hour/${symbol}`;
         } else {
-            // For longer ranges, use daily prices
-            // endpoint = `/historical-price-full/${symbol}`;
-            // But the interface for HistoricalPrice in types might expect specific fields. 
-            // Let's stick to the chart endpoint if possible or normalize.
-            // However, historical-chart endpoint returns array of {date, open, low, high, close, volume} directly
-            // historical-price-full returns object with historical array.
-
-            // Simplification for this task: Use 4hour for longer ranges to get enough data points without too much weight
             endpoint = `/historical-chart/4hour/${symbol}`;
         }
 
         const data = await fetchFMP(endpoint);
+        if (!data || data.length === 0) throw new Error('No data');
 
-        // FMP returns data sorted new to old usually. Reverse for chart if needed, but charts often take it as is.
-        // Let's ensure it matches HistoricalPrice interface { date: string, close: number }
-
-        return data.map((item: any) => ({
+        const mapped = data.map((item: any) => ({
             date: item.date,
-            close: item.close
-        })).reverse(); // Charting libs often want Old -> New
+            close: item.close,
+        })).reverse();
 
-    } catch (error) {
-        console.error('Error fetching historical chart:', error);
-        return [];
+        // Trim to range
+        return trimToRange(mapped, range);
+    } catch {
+        return getYahooHistorical(symbol, range);
     }
 };
+
+function trimToRange(data: HistoricalPrice[], range: string): HistoricalPrice[] {
+    if (data.length === 0) return data;
+    const now = new Date();
+    let cutoff: Date;
+    switch (range) {
+        case '1D': cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
+        case '1W': cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+        case '1M': cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+        case '3M': cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+        default: return data;
+    }
+    return data.filter(p => new Date(p.date) >= cutoff);
+}
+
+async function getYahooHistorical(symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'): Promise<HistoricalPrice[]> {
+    const rangeMap: Record<string, { range: string; interval: string }> = {
+        '1D': { range: '1d', interval: '5m' },
+        '1W': { range: '5d', interval: '30m' },
+        '1M': { range: '1mo', interval: '1h' },
+        '3M': { range: '3mo', interval: '1d' },
+        '1Y': { range: '1y', interval: '1d' },
+        'ALL': { range: '5y', interval: '1wk' },
+    };
+    const { range: yRange, interval } = rangeMap[range] || rangeMap['1M'];
+
+    try {
+        const encoded = encodeURIComponent(symbol);
+        const res = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=${yRange}&interval=${interval}`,
+            { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } }
+        );
+        if (!res.ok) return [];
+        const json = await res.json();
+        const result = json.chart?.result?.[0];
+        if (!result) return [];
+
+        const timestamps: number[] = result.timestamp || [];
+        const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
+
+        const prices: HistoricalPrice[] = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            if (closes[i] != null) {
+                prices.push({
+                    date: new Date(timestamps[i] * 1000).toISOString(),
+                    close: closes[i] as number,
+                });
+            }
+        }
+        return prices;
+    } catch {
+        return [];
+    }
+}
+
+// Quick sparkline data (5-day, hourly) via Yahoo for any symbol
+export async function getSparklineData(symbol: string): Promise<HistoricalPrice[]> {
+    return getYahooHistorical(symbol, '1W');
+}
 
 export const getAnalystRatings = async (symbol: string, limit: number = 5): Promise<AnalystRating[]> => {
     try {

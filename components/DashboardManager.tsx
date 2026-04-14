@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange } from '@/types';
 import { getMarketNews } from '@/lib/fmp';
-import { getStockQuoteAction } from '@/actions/quotes';
+import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
@@ -58,21 +58,15 @@ export default function DashboardManager() {
         if (watchlist.length === 0) return;
 
         const fetchData = async () => {
-            // Fetch Quotes Sequentially to avoid rate limits
-            const validQuotes: StockQuote[] = [];
-            for (const sym of watchlist) {
-                try {
-                    const q = await getStockQuoteAction(sym);
-                    validQuotes.push(q);
-                } catch (e) {
-                    console.error('Error fetching quote for', sym, e);
-                }
-                await new Promise(r => setTimeout(r, 250));
-            }
-            setQuotes(validQuotes);
+            // Fetch everything in parallel: quotes (batch), news, and analyst data
+            const [batchQuotes, newsResults, consensusRes, ratingChanges] = await Promise.all([
+                getBatchQuotesAction(watchlist).catch(() => [] as StockQuote[]),
+                getMarketNews(50, watchlist).catch(() => [] as NewsArticle[]),
+                getWatchlistConsensusAction(watchlist).catch(() => []),
+                getWatchlistRatingChangesAction(watchlist).catch(() => []),
+            ]);
 
-            // Fetch News (filtered by watchlist)
-            const newsResults = await getMarketNews(50, watchlist);
+            setQuotes(batchQuotes);
 
             const now = new Date();
             const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -92,12 +86,6 @@ export default function DashboardManager() {
 
             setRecentNews(recent);
             setMissedNews(missed);
-
-            // Fetch Analyst Consensus + Rating Changes for watchlist
-            const [consensusRes, ratingChanges] = await Promise.all([
-                getWatchlistConsensusAction(watchlist),
-                getWatchlistRatingChangesAction(watchlist),
-            ]);
             setConsensus(consensusRes);
             setRatingAlerts(ratingChanges);
         };

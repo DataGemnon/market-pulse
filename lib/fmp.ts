@@ -101,6 +101,65 @@ async function getYahooQuote(symbol: string): Promise<StockQuote> {
     };
 }
 
+// Batch fetch: FMP for US stocks in one call, Yahoo for non-US in parallel
+export const getBatchQuotes = async (symbols: string[]): Promise<StockQuote[]> => {
+    const usSymbols = symbols.filter(s => !isNonUSSymbol(s));
+    const nonUSSymbols = symbols.filter(s => isNonUSSymbol(s));
+
+    const results: StockQuote[] = [];
+
+    // Fetch all US quotes in a single FMP call
+    if (usSymbols.length > 0) {
+        try {
+            const joined = usSymbols.join(',');
+            const data = await fetchFMP(`/quote/${joined}`);
+            for (const item of data) {
+                results.push({
+                    symbol: item.symbol,
+                    name: item.name,
+                    price: item.price,
+                    changesPercentage: item.changesPercentage,
+                    change: item.change,
+                    dayLow: item.dayLow,
+                    dayHigh: item.dayHigh,
+                    yearHigh: item.yearHigh,
+                    yearLow: item.yearLow,
+                    marketCap: item.marketCap,
+                    volume: item.volume,
+                    avgVolume: item.avgVolume,
+                    open: item.open,
+                    previousClose: item.previousClose,
+                    eps: item.eps,
+                    pe: item.pe,
+                    earningsAnnouncement: item.earningsAnnouncement,
+                    sharesOutstanding: item.sharesOutstanding,
+                    timestamp: item.timestamp,
+                    currency: 'USD',
+                });
+            }
+        } catch (error) {
+            // Fallback: fetch individually via Yahoo
+            for (const sym of usSymbols) {
+                try {
+                    results.push(await getYahooQuote(sym));
+                } catch { /* skip */ }
+            }
+        }
+    }
+
+    // Fetch non-US quotes in parallel via Yahoo
+    if (nonUSSymbols.length > 0) {
+        const yahooResults = await Promise.all(
+            nonUSSymbols.map(sym => getYahooQuote(sym).catch(() => null))
+        );
+        for (const q of yahooResults) {
+            if (q) results.push(q);
+        }
+    }
+
+    return results;
+};
+
 export const getStockQuote = async (symbol: string): Promise<StockQuote> => {
     // Non-US symbols go straight to Yahoo Finance
     if (isNonUSSymbol(symbol)) {

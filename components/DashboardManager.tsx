@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange } from '@/types';
-import { getStockQuote, getMarketNews } from '@/lib/fmp';
+import { getMarketNews } from '@/lib/fmp';
+import { getStockQuoteAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
@@ -61,7 +62,7 @@ export default function DashboardManager() {
             const validQuotes: StockQuote[] = [];
             for (const sym of watchlist) {
                 try {
-                    const q = await getStockQuote(sym);
+                    const q = await getStockQuoteAction(sym);
                     validQuotes.push(q);
                 } catch (e) {
                     console.error('Error fetching quote for', sym, e);
@@ -113,7 +114,7 @@ export default function DashboardManager() {
         if (watchlist.includes(upper)) return;
 
         try {
-            await getStockQuote(upper);
+            await getStockQuoteAction(upper);
             const newWatchlist = [...watchlist, upper];
             setWatchlist(newWatchlist);
         } catch (error) {
@@ -139,7 +140,8 @@ export default function DashboardManager() {
         name: q.name,
         price: q.price,
         changesPercentage: q.changesPercentage,
-        volume: q.volume
+        volume: q.volume,
+        currency: q.currency,
     }));
 
     // Filter undismissed alerts (last 7 days only)

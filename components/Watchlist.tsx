@@ -4,6 +4,21 @@ import { WatchlistItem } from '@/types';
 import { Plus, TrendingUp, TrendingDown, Trash2, X, Check } from 'lucide-react';
 import { useState } from 'react';
 
+function getCurrencySymbol(currency?: string): string {
+    const c = currency || 'USD';
+    switch (c) {
+        case 'EUR': return '€';
+        case 'GBP': return '£';
+        case 'GBp': return '£';  // pence — displayed as-is, Yahoo returns pence for LSE
+        case 'JPY': return '¥';
+        case 'CHF': return 'CHF ';
+        case 'HKD': return 'HK$';
+        case 'SEK': case 'DKK': case 'NOK': return `${c} `;
+        case 'USD': return '$';
+        default: return `${c} `;
+    }
+}
+
 interface WatchlistProps {
     items: WatchlistItem[];
     onAddSymbol: (symbol: string) => void;
@@ -41,7 +56,7 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol }: WatchlistProps) => {
                         type="text"
                         value={newSymbol}
                         onChange={(e) => setNewSymbol(e.target.value)}
-                        placeholder="Symbol (e.g. MSFT)"
+                        placeholder="e.g. MSFT, MC.PA, SAP.DE"
                         className="flex-1 px-3 py-2 text-sm bg-white/[0.05] border border-white/[0.1] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 text-white placeholder-slate-500 uppercase"
                         autoFocus
                     />
@@ -89,7 +104,7 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol }: WatchlistProps) => {
                                     </td>
                                     <td className="px-5 py-4 whitespace-nowrap text-right">
                                         <div className="text-sm font-semibold text-white tabular-nums">
-                                            ${item.price.toFixed(2)}
+                                            {getCurrencySymbol(item.currency)}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </div>
                                     </td>
                                     <td className="px-5 py-4 whitespace-nowrap text-right">

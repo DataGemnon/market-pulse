@@ -55,7 +55,59 @@ export const getMarketIndices = async (): Promise<MarketIndex[]> => {
     }
 };
 
+// Detect non-US symbols (contain a dot suffix like .PA, .DE, .L, .AS, etc.)
+function isNonUSSymbol(symbol: string): boolean {
+    return /\.[A-Z]{1,3}$/.test(symbol.toUpperCase());
+}
+
+async function getYahooQuote(symbol: string): Promise<StockQuote> {
+    const encoded = encodeURIComponent(symbol);
+    const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1d`,
+        { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    if (!res.ok) throw new Error(`Yahoo Finance Error: ${res.status}`);
+    const json = await res.json();
+    const meta = json.chart?.result?.[0]?.meta;
+    if (!meta) throw new Error('Stock not found on Yahoo Finance');
+
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose;
+    const change = price - prevClose;
+    const changesPercentage = (change / prevClose) * 100;
+    const currency = meta.currency || 'USD';
+
+    return {
+        symbol: meta.symbol,
+        name: meta.longName || meta.shortName || symbol,
+        price,
+        changesPercentage,
+        change,
+        dayLow: meta.regularMarketDayLow || 0,
+        dayHigh: meta.regularMarketDayHigh || 0,
+        yearHigh: meta.fiftyTwoWeekHigh || 0,
+        yearLow: meta.fiftyTwoWeekLow || 0,
+        marketCap: 0,
+        volume: meta.regularMarketVolume || 0,
+        avgVolume: 0,
+        open: 0,
+        previousClose: prevClose,
+        eps: 0,
+        pe: 0,
+        earningsAnnouncement: '',
+        sharesOutstanding: 0,
+        timestamp: meta.regularMarketTime || 0,
+        currency,
+    };
+}
+
 export const getStockQuote = async (symbol: string): Promise<StockQuote> => {
+    // Non-US symbols go straight to Yahoo Finance
+    if (isNonUSSymbol(symbol)) {
+        return getYahooQuote(symbol);
+    }
+
+    // US symbols: try FMP first, fall back to Yahoo
     try {
         const data = await fetchFMP(`/quote/${symbol}`);
         if (!data || data.length === 0) {
@@ -82,12 +134,11 @@ export const getStockQuote = async (symbol: string): Promise<StockQuote> => {
             earningsAnnouncement: item.earningsAnnouncement,
             sharesOutstanding: item.sharesOutstanding,
             timestamp: item.timestamp,
+            currency: 'USD',
         };
     } catch (error) {
-        console.error(`Error fetching quote for ${symbol}:`, error);
-        // Return a fallback or rethrow depending on desired behavior. 
-        // For now, rethrowing to be handled by caller or returning a skeleton object if critical
-        throw error;
+        console.error(`FMP quote failed for ${symbol}, trying Yahoo:`, error);
+        return getYahooQuote(symbol);
     }
 };
 

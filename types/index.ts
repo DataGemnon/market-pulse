@@ -18,6 +18,7 @@ export interface StockQuote {
   earningsAnnouncement: string;
   sharesOutstanding: number;
   timestamp: number;
+  currency?: string;
 }
 
 export interface MarketIndex {
@@ -54,6 +55,7 @@ export interface WatchlistItem {
   price: number;
   changesPercentage: number;
   volume: number;
+  currency?: string;
 }
 
 export interface HistoricalPrice {

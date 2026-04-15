@@ -1,32 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange } from '@/types';
+import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings } from '@/types';
 import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
+import { getWatchlistEarningsAction } from '@/actions/earnings';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import InsiderTradingTracker from '@/components/InsiderTradingTracker';
+import EarningsCalendar from '@/components/EarningsCalendar';
 import { TrendingUp, TrendingDown, Bell, X } from 'lucide-react';
 
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
 
 export default function DashboardManager() {
     const [watchlist, setWatchlist] = useState<string[]>([]);
+    const [positions, setPositions] = useState<Record<string, Position>>({});
     const [recentNews, setRecentNews] = useState<NewsArticle[]>([]);
     const [missedNews, setMissedNews] = useState<NewsArticle[]>([]);
     const [quotes, setQuotes] = useState<StockQuote[]>([]);
+    const [earnings, setEarnings] = useState<UpcomingEarnings[]>([]);
 
     // Intelligence Hub State
     const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
     const [ratingAlerts, setRatingAlerts] = useState<RatingChange[]>([]);
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
-    // 1. Load Watchlist from LocalStorage on Mount
+    // 1. Load Watchlist + Positions from LocalStorage on Mount
     useEffect(() => {
         const stored = localStorage.getItem('vektora-watchlist');
         if (stored) {
@@ -44,6 +48,17 @@ export default function DashboardManager() {
             setWatchlist(DEFAULT_WATCHLIST);
         }
 
+        // Load positions
+        const storedPositions = localStorage.getItem('vektora-positions');
+        if (storedPositions) {
+            try {
+                const parsed = JSON.parse(storedPositions);
+                if (parsed && typeof parsed === 'object') {
+                    setPositions(parsed);
+                }
+            } catch { /* ignore */ }
+        }
+
         // Load dismissed alerts
         const dismissed = localStorage.getItem('vektora-dismissed-alerts');
         if (dismissed) {
@@ -58,15 +73,17 @@ export default function DashboardManager() {
         if (watchlist.length === 0) return;
 
         const fetchData = async () => {
-            // Fetch everything in parallel: quotes (batch), news, and analyst data
-            const [batchQuotes, newsResults, consensusRes, ratingChanges] = await Promise.all([
+            // Fetch everything in parallel: quotes (batch), news, analyst, earnings
+            const [batchQuotes, newsResults, consensusRes, ratingChanges, earningsRes] = await Promise.all([
                 getBatchQuotesAction(watchlist).catch(() => [] as StockQuote[]),
                 getMarketNews(50, watchlist).catch(() => [] as NewsArticle[]),
                 getWatchlistConsensusAction(watchlist).catch(() => []),
                 getWatchlistRatingChangesAction(watchlist).catch(() => []),
+                getWatchlistEarningsAction(watchlist).catch(() => [] as UpcomingEarnings[]),
             ]);
 
             setQuotes(batchQuotes);
+            setEarnings(earningsRes);
 
             const now = new Date();
             const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -113,6 +130,24 @@ export default function DashboardManager() {
     const handleRemoveSymbol = (symbol: string) => {
         const newWatchlist = watchlist.filter(s => s !== symbol);
         setWatchlist(newWatchlist);
+        // Also remove any saved position for the removed stock
+        if (positions[symbol]) {
+            const next = { ...positions };
+            delete next[symbol];
+            setPositions(next);
+            localStorage.setItem('vektora-positions', JSON.stringify(next));
+        }
+    };
+
+    const handleSetPosition = (symbol: string, position: Position | null) => {
+        const next = { ...positions };
+        if (position === null) {
+            delete next[symbol];
+        } else {
+            next[symbol] = position;
+        }
+        setPositions(next);
+        localStorage.setItem('vektora-positions', JSON.stringify(next));
     };
 
     const handleDismissAlert = (alertKey: string) => {
@@ -122,7 +157,7 @@ export default function DashboardManager() {
         localStorage.setItem('vektora-dismissed-alerts', JSON.stringify([...updated]));
     };
 
-    // Transform quotes to WatchlistItems
+    // Transform quotes to WatchlistItems (merging in any saved position)
     const watchlistItems: WatchlistItem[] = quotes.map(q => ({
         symbol: q.symbol,
         name: q.name,
@@ -130,6 +165,7 @@ export default function DashboardManager() {
         changesPercentage: q.changesPercentage,
         volume: q.volume,
         currency: q.currency,
+        position: positions[q.symbol],
     }));
 
     // Filter undismissed alerts (last 7 days only)
@@ -207,6 +243,7 @@ export default function DashboardManager() {
                         items={watchlistItems}
                         onAddSymbol={handleAddSymbol}
                         onRemoveSymbol={handleRemoveSymbol}
+                        onSetPosition={handleSetPosition}
                     />
                 </div>
 
@@ -222,6 +259,8 @@ export default function DashboardManager() {
                     {/* Sidebar */}
                     <div className="xl:col-span-4 space-y-6">
                         <MarketBriefing news={recentNews} />
+
+                        <EarningsCalendar earnings={earnings} />
 
                         <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-white/[0.1]">
                             <AnalystFeed consensus={consensus} />

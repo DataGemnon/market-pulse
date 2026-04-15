@@ -49,6 +49,11 @@ export interface Alert {
   active: boolean;
 }
 
+export interface Position {
+  buyPrice: number;
+  quantity: number;
+}
+
 export interface WatchlistItem {
   symbol: string;
   name: string;
@@ -56,6 +61,16 @@ export interface WatchlistItem {
   changesPercentage: number;
   volume: number;
   currency?: string;
+  position?: Position;
+}
+
+export interface UpcomingEarnings {
+  symbol: string;
+  name: string;
+  date: string;
+  epsEstimated: number | null;
+  revenueEstimated: number | null;
+  time: string; // 'bmo' | 'amc' | ''
 }
 
 export interface HistoricalPrice {

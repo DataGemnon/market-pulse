@@ -1,4 +1,4 @@
-import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, RatingChange } from '@/types';
+import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, RatingChange, UpcomingEarnings } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
@@ -378,6 +378,50 @@ export const getPriceTargets = async (symbol: string, limit: number = 5): Promis
         }));
     } catch (error) {
         console.error(`Error fetching price targets for ${symbol}:`, error);
+        return [];
+    }
+};
+
+// Fetch upcoming earnings for a list of symbols (next 60 days)
+export const getUpcomingEarnings = async (symbols: string[]): Promise<UpcomingEarnings[]> => {
+    if (symbols.length === 0) return [];
+
+    const now = new Date();
+    const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+    // Use FMP's earning_calendar with date range for one batch call (covers all stocks)
+    try {
+        const from = now.toISOString().split('T')[0];
+        const to = sixtyDaysFromNow.toISOString().split('T')[0];
+        const data = await fetchFMP('/earning_calendar', { from, to });
+
+        const symbolSet = new Set(symbols.map(s => s.toUpperCase()));
+        const filtered = data.filter((item: any) => symbolSet.has(item.symbol?.toUpperCase()));
+
+        // Get company names in one batch (US symbols only — non-US won't match earning_calendar anyway)
+        const nameMap: Record<string, string> = {};
+        const usSymbols = symbols.filter(s => !isNonUSSymbol(s));
+        if (usSymbols.length > 0) {
+            try {
+                const quotes = await fetchFMP(`/quote/${usSymbols.join(',')}`);
+                for (const q of quotes) nameMap[q.symbol] = q.name || q.symbol;
+            } catch { /* ignore */ }
+        }
+
+        return filtered
+            .map((item: any) => ({
+                symbol: item.symbol,
+                name: nameMap[item.symbol] || item.symbol,
+                date: item.date,
+                epsEstimated: item.epsEstimated,
+                revenueEstimated: item.revenueEstimated,
+                time: item.time || '',
+            }))
+            .sort((a: UpcomingEarnings, b: UpcomingEarnings) =>
+                new Date(a.date).getTime() - new Date(b.date).getTime()
+            );
+    } catch (error) {
+        console.error('Error fetching upcoming earnings:', error);
         return [];
     }
 };

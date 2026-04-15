@@ -1,10 +1,11 @@
 'use client';
 
-import { Position, WatchlistItem } from '@/types';
-import { Plus, TrendingUp, TrendingDown, Trash2, X, Check, ChevronDown, Briefcase, Edit3 } from 'lucide-react';
+import { Position, PriceAlert, WatchlistItem } from '@/types';
+import { Plus, TrendingUp, TrendingDown, Trash2, X, Check, ChevronDown, Briefcase, Edit3, Bell } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import Sparkline from '@/components/Sparkline';
 import StockChart from '@/components/StockChart';
+import AlertModal from '@/components/AlertModal';
 
 function getCurrencySymbol(currency?: string): string {
     const c = currency || 'USD';
@@ -28,16 +29,20 @@ function formatCurrency(value: number, currency?: string): string {
 
 interface WatchlistProps {
     items: WatchlistItem[];
+    alerts: PriceAlert[];
     onAddSymbol: (symbol: string) => void;
     onRemoveSymbol: (symbol: string) => void;
     onSetPosition: (symbol: string, position: Position | null) => void;
+    onAddAlert: (alert: Omit<PriceAlert, 'id' | 'createdAt' | 'triggered'>) => void;
+    onRemoveAlert: (alertId: string) => void;
 }
 
-const Watchlist = ({ items, onAddSymbol, onRemoveSymbol, onSetPosition }: WatchlistProps) => {
+const Watchlist = ({ items, alerts, onAddSymbol, onRemoveSymbol, onSetPosition, onAddAlert, onRemoveAlert }: WatchlistProps) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newSymbol, setNewSymbol] = useState('');
     const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
     const [editingPosition, setEditingPosition] = useState<WatchlistItem | null>(null);
+    const [editingAlerts, setEditingAlerts] = useState<WatchlistItem | null>(null);
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -141,6 +146,7 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol, onSetPosition }: Watchl
                             <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price</th>
                             <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Change</th>
                             <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">P&amp;L</th>
+                            <th className="px-3 py-3 w-12"></th>
                             <th className="px-5 py-3 w-12"></th>
                         </tr>
                     </thead>
@@ -218,6 +224,30 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol, onSetPosition }: Watchl
                                                 </button>
                                             )}
                                         </td>
+                                        <td className="px-3 py-4 whitespace-nowrap text-right w-12">
+                                            {(() => {
+                                                const symbolAlerts = alerts.filter(a => a.symbol === item.symbol && !a.triggered);
+                                                const count = symbolAlerts.length;
+                                                return (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setEditingAlerts(item); }}
+                                                        className={`relative p-1.5 rounded-lg transition-all ${
+                                                            count > 0
+                                                                ? 'text-cyan-400 hover:bg-cyan-500/10'
+                                                                : 'text-slate-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100'
+                                                        }`}
+                                                        title={count > 0 ? `${count} active alert${count > 1 ? 's' : ''}` : 'Set price alert'}
+                                                    >
+                                                        <Bell size={14} />
+                                                        {count > 0 && (
+                                                            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 bg-cyan-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                                                {count}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="px-5 py-4 whitespace-nowrap text-right">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onRemoveSymbol(item.symbol); }}
@@ -230,7 +260,7 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol, onSetPosition }: Watchl
                                     </tr>
                                     {isExpanded && (
                                         <tr className="border-b border-white/[0.03]">
-                                            <td colSpan={6} className="bg-white/[0.01]">
+                                            <td colSpan={7} className="bg-white/[0.01]">
                                                 <StockChart symbol={item.symbol} isPositive={isPositive} currency={item.currency} />
                                             </td>
                                         </tr>
@@ -250,6 +280,16 @@ const Watchlist = ({ items, onAddSymbol, onRemoveSymbol, onSetPosition }: Watchl
                         onSetPosition(editingPosition.symbol, position);
                         setEditingPosition(null);
                     }}
+                />
+            )}
+
+            {editingAlerts && (
+                <AlertModal
+                    item={editingAlerts}
+                    alerts={alerts}
+                    onClose={() => setEditingAlerts(null)}
+                    onAdd={onAddAlert}
+                    onRemove={onRemoveAlert}
                 />
             )}
         </div>

@@ -39,14 +39,15 @@ export interface NewsArticle {
   url: string;
 }
 
-export interface Alert {
+export interface PriceAlert {
   id: string;
   symbol: string;
-  type: 'price_above' | 'price_below' | 'volume_spike' | 'news';
-  value?: number;
-  triggered: boolean;
+  type: 'above' | 'below';
+  price: number;
   createdAt: string;
-  active: boolean;
+  triggered: boolean;
+  triggeredAt?: string;
+  triggeredPrice?: number;
 }
 
 export interface Position {

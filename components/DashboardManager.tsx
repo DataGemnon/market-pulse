@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings } from '@/types';
+import { useState, useEffect, useRef } from 'react';
+import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings, PriceAlert } from '@/types';
 import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
+import { sendNotification } from '@/lib/notifications';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -13,13 +14,21 @@ import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import InsiderTradingTracker from '@/components/InsiderTradingTracker';
 import EarningsCalendar from '@/components/EarningsCalendar';
-import { TrendingUp, TrendingDown, Bell, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown } from 'lucide-react';
+
+function formatCurrency(value: number, currency?: string): string {
+    const c = currency || 'USD';
+    const sym = c === 'EUR' ? '€' : c === 'GBP' || c === 'GBp' ? '£' : c === 'JPY' ? '¥' : c === 'USD' ? '$' : `${c} `;
+    return `${sym}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
 
 export default function DashboardManager() {
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [positions, setPositions] = useState<Record<string, Position>>({});
+    const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+    const [recentlyTriggered, setRecentlyTriggered] = useState<PriceAlert[]>([]);
     const [recentNews, setRecentNews] = useState<NewsArticle[]>([]);
     const [missedNews, setMissedNews] = useState<NewsArticle[]>([]);
     const [quotes, setQuotes] = useState<StockQuote[]>([]);
@@ -29,6 +38,9 @@ export default function DashboardManager() {
     const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
     const [ratingAlerts, setRatingAlerts] = useState<RatingChange[]>([]);
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+
+    // Track which alert IDs we've already notified for, to avoid duplicate browser notifications
+    const notifiedAlertIds = useRef<Set<string>>(new Set());
 
     // 1. Load Watchlist + Positions from LocalStorage on Mount
     useEffect(() => {
@@ -55,6 +67,21 @@ export default function DashboardManager() {
                 const parsed = JSON.parse(storedPositions);
                 if (parsed && typeof parsed === 'object') {
                     setPositions(parsed);
+                }
+            } catch { /* ignore */ }
+        }
+
+        // Load price alerts
+        const storedAlerts = localStorage.getItem('vektora-price-alerts');
+        if (storedAlerts) {
+            try {
+                const parsed = JSON.parse(storedAlerts);
+                if (Array.isArray(parsed)) {
+                    setPriceAlerts(parsed);
+                    // Pre-mark already-triggered alerts as notified so we don't re-notify on first load
+                    parsed.forEach((a: PriceAlert) => {
+                        if (a.triggered) notifiedAlertIds.current.add(a.id);
+                    });
                 }
             } catch { /* ignore */ }
         }
@@ -137,6 +164,12 @@ export default function DashboardManager() {
             setPositions(next);
             localStorage.setItem('vektora-positions', JSON.stringify(next));
         }
+        // Remove any price alerts for this symbol
+        const remainingAlerts = priceAlerts.filter(a => a.symbol !== symbol);
+        if (remainingAlerts.length !== priceAlerts.length) {
+            persistAlerts(remainingAlerts);
+        }
+        setRecentlyTriggered(prev => prev.filter(a => a.symbol !== symbol));
     };
 
     const handleSetPosition = (symbol: string, position: Position | null) => {
@@ -149,6 +182,78 @@ export default function DashboardManager() {
         setPositions(next);
         localStorage.setItem('vektora-positions', JSON.stringify(next));
     };
+
+    const persistAlerts = (alerts: PriceAlert[]) => {
+        setPriceAlerts(alerts);
+        localStorage.setItem('vektora-price-alerts', JSON.stringify(alerts));
+    };
+
+    const handleAddAlert = (input: Omit<PriceAlert, 'id' | 'createdAt' | 'triggered'>) => {
+        const newAlert: PriceAlert = {
+            ...input,
+            id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: new Date().toISOString(),
+            triggered: false,
+        };
+        persistAlerts([...priceAlerts, newAlert]);
+    };
+
+    const handleRemoveAlert = (alertId: string) => {
+        persistAlerts(priceAlerts.filter(a => a.id !== alertId));
+        notifiedAlertIds.current.delete(alertId);
+        setRecentlyTriggered(prev => prev.filter(a => a.id !== alertId));
+    };
+
+    const handleDismissTriggered = (alertId: string) => {
+        setRecentlyTriggered(prev => prev.filter(a => a.id !== alertId));
+    };
+
+    // Check for price alert crossings whenever quotes update
+    useEffect(() => {
+        if (quotes.length === 0 || priceAlerts.length === 0) return;
+
+        const quoteMap = new Map(quotes.map(q => [q.symbol, q]));
+        const justTriggered: PriceAlert[] = [];
+        let mutated = false;
+
+        const updatedAlerts = priceAlerts.map(alert => {
+            if (alert.triggered) return alert;
+            const q = quoteMap.get(alert.symbol);
+            if (!q) return alert;
+
+            const crossed =
+                (alert.type === 'above' && q.price >= alert.price) ||
+                (alert.type === 'below' && q.price <= alert.price);
+
+            if (!crossed) return alert;
+
+            mutated = true;
+            const triggered: PriceAlert = {
+                ...alert,
+                triggered: true,
+                triggeredAt: new Date().toISOString(),
+                triggeredPrice: q.price,
+            };
+            justTriggered.push(triggered);
+
+            // Send browser notification once per alert
+            if (!notifiedAlertIds.current.has(alert.id)) {
+                notifiedAlertIds.current.add(alert.id);
+                sendNotification({
+                    title: `${q.symbol} price alert`,
+                    body: `${q.name} ${alert.type === 'above' ? 'rose above' : 'fell below'} ${formatCurrency(alert.price, q.currency)} (now ${formatCurrency(q.price, q.currency)})`,
+                    tag: alert.id,
+                });
+            }
+
+            return triggered;
+        });
+
+        if (mutated) {
+            persistAlerts(updatedAlerts);
+            setRecentlyTriggered(prev => [...prev, ...justTriggered]);
+        }
+    }, [quotes]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleDismissAlert = (alertKey: string) => {
         const updated = new Set(dismissedAlerts);
@@ -185,6 +290,57 @@ export default function DashboardManager() {
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-500">Your Dashboard</h2>
                     <div className="h-px flex-1 bg-gradient-to-l from-white/10 to-transparent" />
                 </div>
+
+                {/* Triggered Price Alerts */}
+                {recentlyTriggered.length > 0 && (
+                    <div className="space-y-2">
+                        {recentlyTriggered.map(alert => {
+                            const q = quotes.find(qq => qq.symbol === alert.symbol);
+                            const isAbove = alert.type === 'above';
+                            return (
+                                <div
+                                    key={alert.id}
+                                    className={`flex items-center gap-3 p-4 rounded-xl border backdrop-blur-sm animate-in fade-in slide-in-from-top-2 ${
+                                        isAbove
+                                            ? 'bg-emerald-500/[0.08] border-emerald-500/20'
+                                            : 'bg-red-500/[0.08] border-red-500/20'
+                                    }`}
+                                >
+                                    <div className={`p-2 rounded-lg flex-shrink-0 ${isAbove ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                                        <BellRing size={16} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${isAbove ? 'text-emerald-400 bg-emerald-500/15' : 'text-red-400 bg-red-500/15'}`}>
+                                                Price Alert
+                                            </span>
+                                            {isAbove ? <ArrowUp size={11} className="text-emerald-400" /> : <ArrowDown size={11} className="text-red-400" />}
+                                        </div>
+                                        <p className="text-sm text-white">
+                                            <span className="font-bold">{q?.name || alert.symbol}</span>
+                                            {isAbove ? ' rose above ' : ' fell below '}
+                                            <span className="font-bold tabular-nums">{formatCurrency(alert.price, q?.currency)}</span>
+                                            {alert.triggeredPrice != null && (
+                                                <>
+                                                    {' — now '}
+                                                    <span className={`font-bold tabular-nums ${isAbove ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                        {formatCurrency(alert.triggeredPrice, q?.currency)}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleDismissTriggered(alert.id)}
+                                        className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {/* Rating Change Alerts */}
                 {activeAlerts.length > 0 && (
@@ -241,9 +397,12 @@ export default function DashboardManager() {
                 <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden">
                     <Watchlist
                         items={watchlistItems}
+                        alerts={priceAlerts}
                         onAddSymbol={handleAddSymbol}
                         onRemoveSymbol={handleRemoveSymbol}
                         onSetPosition={handleSetPosition}
+                        onAddAlert={handleAddAlert}
+                        onRemoveAlert={handleRemoveAlert}
                     />
                 </div>
 

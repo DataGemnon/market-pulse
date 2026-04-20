@@ -30,7 +30,7 @@ Do not use introductory text like "Here are the points". Just the bullets.
     `;
 
         const msg = await anthropic.messages.create({
-            model: "claude-3-haiku-20240307",
+            model: "claude-3-5-haiku-20241022",
             max_tokens: 150,
             temperature: 0.5,
             messages: [

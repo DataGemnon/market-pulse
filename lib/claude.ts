@@ -51,7 +51,7 @@ ${articlesText}
 
     try {
         const msg = await getClient().messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
             max_tokens: 150,
             temperature: 0,
             messages: [
@@ -148,7 +148,7 @@ export async function analyzeMarketImpact(news: GeneralNewsArticle[], events: Ec
 
     try {
         const msg = await getClient().messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
             max_tokens: 400,
             temperature: 0,
             messages: [
@@ -205,7 +205,7 @@ ${newsContext}
 
     try {
         const msg = await getClient().messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
             max_tokens: 800,
             temperature: 0,
             messages: [

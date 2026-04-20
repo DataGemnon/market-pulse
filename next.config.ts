@@ -1,35 +1,11 @@
 import type { NextConfig } from "next";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 
-// Load .env.local manually for local dev (Turbopack workaround).
-// On Vercel/cloud, env vars come from the platform's dashboard via process.env.
-function loadEnvLocal() {
-  try {
-    const envPath = resolve(process.cwd(), '.env.local');
-    const content = readFileSync(envPath, 'utf8');
-    const vars: Record<string, string> = {};
-    for (const line of content.split('\n')) {
-      const idx = line.indexOf('=');
-      if (idx > 0) {
-        const key = line.substring(0, idx).trim();
-        const val = line.substring(idx + 1).trim();
-        if (key && val) vars[key] = val;
-      }
-    }
-    return vars;
-  } catch {
-    return {};
-  }
-}
+// ANTHROPIC_API_KEY and FINNHUB_API_KEY are server-only secrets.
+// They do NOT go in the `env:` block (which exposes values to the client bundle).
+// Instead they are read directly via process.env inside server actions and API routes.
+// In local dev, Next.js automatically loads .env.local.
+// On Vercel, add them via the dashboard: Settings → Environment Variables.
 
-const envVars = loadEnvLocal();
-
-const nextConfig: NextConfig = {
-  env: {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || envVars.ANTHROPIC_API_KEY || '',
-    FINNHUB_API_KEY: process.env.FINNHUB_API_KEY || envVars.FINNHUB_API_KEY || '',
-  },
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

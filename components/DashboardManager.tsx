@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings, PriceAlert } from '@/types';
 import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
 import { sendNotification } from '@/lib/notifications';
+import { createClient } from '@/lib/supabase/client';
+import {
+    getWatchlistFromDB, saveWatchlistToDB, addSymbolToDB, removeSymbolFromDB,
+    getPositionsFromDB, upsertPositionToDB, deletePositionFromDB,
+    getAlertsFromDB, insertAlertToDB, updateAlertInDB, deleteAlertFromDB,
+    migrateLocalStorageToDB,
+} from '@/actions/db';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -15,6 +22,7 @@ import MarketBriefing from '@/components/MarketBriefing';
 import InsiderTradingTracker from '@/components/InsiderTradingTracker';
 import EarningsCalendar from '@/components/EarningsCalendar';
 import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
 
 function formatCurrency(value: number, currency?: string): string {
     const c = currency || 'USD';
@@ -23,8 +31,13 @@ function formatCurrency(value: number, currency?: string): string {
 }
 
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
+const LS_WATCHLIST = 'vektora-watchlist';
+const LS_POSITIONS = 'vektora-positions';
+const LS_ALERTS = 'vektora-price-alerts';
+const LS_DISMISSED = 'vektora-dismissed-alerts';
 
 export default function DashboardManager() {
+    const [user, setUser] = useState<User | null>(null);
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [positions, setPositions] = useState<Record<string, Position>>({});
     const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
@@ -33,74 +46,130 @@ export default function DashboardManager() {
     const [missedNews, setMissedNews] = useState<NewsArticle[]>([]);
     const [quotes, setQuotes] = useState<StockQuote[]>([]);
     const [earnings, setEarnings] = useState<UpcomingEarnings[]>([]);
-
-    // Intelligence Hub State
     const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
     const [ratingAlerts, setRatingAlerts] = useState<RatingChange[]>([]);
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
-    // Track which alert IDs we've already notified for, to avoid duplicate browser notifications
+    // Track which alert IDs we've notified to avoid duplicate browser notifications
     const notifiedAlertIds = useRef<Set<string>>(new Set());
+    // Prevent double-migration on fast auth state changes
+    const migrationDone = useRef(false);
 
-    // 1. Load Watchlist + Positions from LocalStorage on Mount
-    useEffect(() => {
-        const stored = localStorage.getItem('vektora-watchlist');
-        if (stored) {
+    // ──────────────────────────────────────────────────
+    // Helpers: read/write localStorage
+    // ──────────────────────────────────────────────────
+    const readLocalStorage = useCallback(() => {
+        const wl = (() => {
             try {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setWatchlist(parsed);
-                } else {
-                    setWatchlist(DEFAULT_WATCHLIST);
-                }
-            } catch (e) {
-                setWatchlist(DEFAULT_WATCHLIST);
-            }
-        } else {
-            setWatchlist(DEFAULT_WATCHLIST);
-        }
+                const s = localStorage.getItem(LS_WATCHLIST);
+                if (!s) return DEFAULT_WATCHLIST;
+                const p = JSON.parse(s);
+                return Array.isArray(p) && p.length > 0 ? p : DEFAULT_WATCHLIST;
+            } catch { return DEFAULT_WATCHLIST; }
+        })();
 
-        // Load positions
-        const storedPositions = localStorage.getItem('vektora-positions');
-        if (storedPositions) {
+        const pos = (() => {
             try {
-                const parsed = JSON.parse(storedPositions);
-                if (parsed && typeof parsed === 'object') {
-                    setPositions(parsed);
-                }
-            } catch { /* ignore */ }
-        }
+                const s = localStorage.getItem(LS_POSITIONS);
+                if (!s) return {} as Record<string, Position>;
+                const p = JSON.parse(s);
+                return (p && typeof p === 'object') ? p : {};
+            } catch { return {} as Record<string, Position>; }
+        })();
 
-        // Load price alerts
-        const storedAlerts = localStorage.getItem('vektora-price-alerts');
-        if (storedAlerts) {
+        const alerts = (() => {
             try {
-                const parsed = JSON.parse(storedAlerts);
-                if (Array.isArray(parsed)) {
-                    setPriceAlerts(parsed);
-                    // Pre-mark already-triggered alerts as notified so we don't re-notify on first load
-                    parsed.forEach((a: PriceAlert) => {
-                        if (a.triggered) notifiedAlertIds.current.add(a.id);
-                    });
-                }
-            } catch { /* ignore */ }
-        }
+                const s = localStorage.getItem(LS_ALERTS);
+                if (!s) return [] as PriceAlert[];
+                const p = JSON.parse(s);
+                return Array.isArray(p) ? p : [];
+            } catch { return [] as PriceAlert[]; }
+        })();
 
-        // Load dismissed alerts
-        const dismissed = localStorage.getItem('vektora-dismissed-alerts');
-        if (dismissed) {
+        const dismissed = (() => {
             try {
-                setDismissedAlerts(new Set(JSON.parse(dismissed)));
-            } catch { /* ignore */ }
-        }
+                const s = localStorage.getItem(LS_DISMISSED);
+                return s ? new Set<string>(JSON.parse(s)) : new Set<string>();
+            } catch { return new Set<string>(); }
+        })();
+
+        return { wl, pos, alerts, dismissed };
     }, []);
 
-    // 2. Fetch Data when Watchlist Changes
+    // ──────────────────────────────────────────────────
+    // Bootstrap: auth listener + initial data load
+    // ──────────────────────────────────────────────────
+    useEffect(() => {
+        const supabase = createClient();
+
+        async function bootstrap(currentUser: User | null) {
+            if (currentUser) {
+                // ── Logged in: load from DB ──
+                const [dbWatchlist, dbPositions, dbAlerts] = await Promise.all([
+                    getWatchlistFromDB(),
+                    getPositionsFromDB(),
+                    getAlertsFromDB(),
+                ]);
+
+                // Run migration if needed (only if DB is empty)
+                if (!migrationDone.current) {
+                    migrationDone.current = true;
+                    const { wl: lsWl, pos: lsPos, alerts: lsAlerts } = readLocalStorage();
+                    if (dbWatchlist.length === 0 && (lsWl !== DEFAULT_WATCHLIST || Object.keys(lsPos).length > 0 || lsAlerts.length > 0)) {
+                        await migrateLocalStorageToDB(lsWl, lsPos, lsAlerts);
+                        // Reload after migration
+                        const [mWl, mPos, mAlerts] = await Promise.all([
+                            getWatchlistFromDB(),
+                            getPositionsFromDB(),
+                            getAlertsFromDB(),
+                        ]);
+                        setWatchlist(mWl.length > 0 ? mWl : DEFAULT_WATCHLIST);
+                        setPositions(mPos);
+                        setPriceAlerts(mAlerts);
+                        mAlerts.forEach(a => { if (a.triggered) notifiedAlertIds.current.add(a.id); });
+                        return;
+                    }
+                }
+
+                setWatchlist(dbWatchlist.length > 0 ? dbWatchlist : DEFAULT_WATCHLIST);
+                setPositions(dbPositions);
+                setPriceAlerts(dbAlerts);
+                dbAlerts.forEach(a => { if (a.triggered) notifiedAlertIds.current.add(a.id); });
+            } else {
+                // ── Not logged in: load from localStorage ──
+                const { wl, pos, alerts, dismissed } = readLocalStorage();
+                setWatchlist(wl);
+                setPositions(pos);
+                setPriceAlerts(alerts);
+                setDismissedAlerts(dismissed);
+                alerts.forEach((a: PriceAlert) => { if (a.triggered) notifiedAlertIds.current.add(a.id); });
+            }
+        }
+
+        // Get initial session
+        supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
+            setUser(currentUser);
+            bootstrap(currentUser);
+        });
+
+        // Listen for auth changes (sign-in / sign-out)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            migrationDone.current = false; // allow migration check on sign-in
+            bootstrap(currentUser);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [readLocalStorage]);
+
+    // ──────────────────────────────────────────────────
+    // Fetch market data when watchlist changes
+    // ──────────────────────────────────────────────────
     useEffect(() => {
         if (watchlist.length === 0) return;
 
         const fetchData = async () => {
-            // Fetch everything in parallel: quotes (batch), news, analyst, earnings
             const [batchQuotes, newsResults, consensusRes, ratingChanges, earningsRes] = await Promise.all([
                 getBatchQuotesAction(watchlist).catch(() => [] as StockQuote[]),
                 getMarketNews(50, watchlist).catch(() => [] as NewsArticle[]),
@@ -118,14 +187,10 @@ export default function DashboardManager() {
 
             const recent: NewsArticle[] = [];
             const missed: NewsArticle[] = [];
-
             newsResults.forEach(article => {
                 const pubDate = new Date(article.publishedDate);
-                if (pubDate >= oneDayAgo) {
-                    recent.push(article);
-                } else if (pubDate >= twoDaysAgo) {
-                    missed.push(article);
-                }
+                if (pubDate >= oneDayAgo) recent.push(article);
+                else if (pubDate >= twoDaysAgo) missed.push(article);
             });
 
             setRecentNews(recent);
@@ -135,80 +200,120 @@ export default function DashboardManager() {
         };
 
         fetchData();
-
-        // Persist to local storage
-        localStorage.setItem('vektora-watchlist', JSON.stringify(watchlist));
-
     }, [watchlist]);
 
+    // ──────────────────────────────────────────────────
+    // Persist localStorage (for non-auth users)
+    // ──────────────────────────────────────────────────
+    const persistLS = useCallback((key: string, value: unknown) => {
+        if (!user) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+    }, [user]);
+
+    // ──────────────────────────────────────────────────
+    // Watchlist mutations
+    // ──────────────────────────────────────────────────
     const handleAddSymbol = async (symbol: string) => {
         const upper = symbol.toUpperCase();
         if (watchlist.includes(upper)) return;
-
         try {
             await getStockQuoteAction(upper);
             const newWatchlist = [...watchlist, upper];
             setWatchlist(newWatchlist);
-        } catch (error) {
+            if (user) {
+                await addSymbolToDB(upper, newWatchlist.length - 1);
+            } else {
+                localStorage.setItem(LS_WATCHLIST, JSON.stringify(newWatchlist));
+            }
+        } catch {
             alert('Invalid symbol or unable to fetch data');
         }
     };
 
-    const handleRemoveSymbol = (symbol: string) => {
+    const handleRemoveSymbol = async (symbol: string) => {
         const newWatchlist = watchlist.filter(s => s !== symbol);
         setWatchlist(newWatchlist);
-        // Also remove any saved position for the removed stock
+
+        // Remove position
         if (positions[symbol]) {
             const next = { ...positions };
             delete next[symbol];
             setPositions(next);
-            localStorage.setItem('vektora-positions', JSON.stringify(next));
+            if (user) await deletePositionFromDB(symbol);
+            else localStorage.setItem(LS_POSITIONS, JSON.stringify(next));
         }
-        // Remove any price alerts for this symbol
-        const remainingAlerts = priceAlerts.filter(a => a.symbol !== symbol);
-        if (remainingAlerts.length !== priceAlerts.length) {
-            persistAlerts(remainingAlerts);
+
+        // Remove alerts
+        const remaining = priceAlerts.filter(a => a.symbol !== symbol);
+        if (remaining.length !== priceAlerts.length) {
+            setPriceAlerts(remaining);
+            if (user) {
+                const toDelete = priceAlerts.filter(a => a.symbol === symbol);
+                await Promise.all(toDelete.map(a => deleteAlertFromDB(a.id)));
+            } else {
+                localStorage.setItem(LS_ALERTS, JSON.stringify(remaining));
+            }
         }
         setRecentlyTriggered(prev => prev.filter(a => a.symbol !== symbol));
+
+        if (user) {
+            await removeSymbolFromDB(symbol);
+        } else {
+            localStorage.setItem(LS_WATCHLIST, JSON.stringify(newWatchlist));
+        }
     };
 
-    const handleSetPosition = (symbol: string, position: Position | null) => {
+    // ──────────────────────────────────────────────────
+    // Position mutations
+    // ──────────────────────────────────────────────────
+    const handleSetPosition = async (symbol: string, position: Position | null) => {
         const next = { ...positions };
         if (position === null) {
             delete next[symbol];
+            if (user) await deletePositionFromDB(symbol);
         } else {
             next[symbol] = position;
+            if (user) await upsertPositionToDB(symbol, position);
         }
         setPositions(next);
-        localStorage.setItem('vektora-positions', JSON.stringify(next));
+        persistLS(LS_POSITIONS, next);
     };
 
-    const persistAlerts = (alerts: PriceAlert[]) => {
+    // ──────────────────────────────────────────────────
+    // Alert mutations
+    // ──────────────────────────────────────────────────
+    const persistAlerts = useCallback(async (alerts: PriceAlert[]) => {
         setPriceAlerts(alerts);
-        localStorage.setItem('vektora-price-alerts', JSON.stringify(alerts));
-    };
+        persistLS(LS_ALERTS, alerts);
+    }, [persistLS]);
 
-    const handleAddAlert = (input: Omit<PriceAlert, 'id' | 'createdAt' | 'triggered'>) => {
+    const handleAddAlert = async (input: Omit<PriceAlert, 'id' | 'createdAt' | 'triggered'>) => {
         const newAlert: PriceAlert = {
             ...input,
             id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             createdAt: new Date().toISOString(),
             triggered: false,
         };
-        persistAlerts([...priceAlerts, newAlert]);
+        const updated = [...priceAlerts, newAlert];
+        await persistAlerts(updated);
+        if (user) await insertAlertToDB(newAlert);
     };
 
-    const handleRemoveAlert = (alertId: string) => {
-        persistAlerts(priceAlerts.filter(a => a.id !== alertId));
+    const handleRemoveAlert = async (alertId: string) => {
+        await persistAlerts(priceAlerts.filter(a => a.id !== alertId));
         notifiedAlertIds.current.delete(alertId);
         setRecentlyTriggered(prev => prev.filter(a => a.id !== alertId));
+        if (user) await deleteAlertFromDB(alertId);
     };
 
     const handleDismissTriggered = (alertId: string) => {
         setRecentlyTriggered(prev => prev.filter(a => a.id !== alertId));
     };
 
-    // Check for price alert crossings whenever quotes update
+    // ──────────────────────────────────────────────────
+    // Price alert crossing detection
+    // ──────────────────────────────────────────────────
     useEffect(() => {
         if (quotes.length === 0 || priceAlerts.length === 0) return;
 
@@ -236,7 +341,6 @@ export default function DashboardManager() {
             };
             justTriggered.push(triggered);
 
-            // Send browser notification once per alert
             if (!notifiedAlertIds.current.has(alert.id)) {
                 notifiedAlertIds.current.add(alert.id);
                 sendNotification({
@@ -251,18 +355,27 @@ export default function DashboardManager() {
 
         if (mutated) {
             persistAlerts(updatedAlerts);
+            // Persist triggered state to DB
+            if (user) {
+                justTriggered.forEach(a => updateAlertInDB(a));
+            }
             setRecentlyTriggered(prev => [...prev, ...justTriggered]);
         }
     }, [quotes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ──────────────────────────────────────────────────
+    // Rating change dismissals
+    // ──────────────────────────────────────────────────
     const handleDismissAlert = (alertKey: string) => {
         const updated = new Set(dismissedAlerts);
         updated.add(alertKey);
         setDismissedAlerts(updated);
-        localStorage.setItem('vektora-dismissed-alerts', JSON.stringify([...updated]));
+        localStorage.setItem(LS_DISMISSED, JSON.stringify([...updated]));
     };
 
-    // Transform quotes to WatchlistItems (merging in any saved position)
+    // ──────────────────────────────────────────────────
+    // Derived data
+    // ──────────────────────────────────────────────────
     const watchlistItems: WatchlistItem[] = quotes.map(q => ({
         symbol: q.symbol,
         name: q.name,
@@ -273,7 +386,6 @@ export default function DashboardManager() {
         position: positions[q.symbol],
     }));
 
-    // Filter undismissed alerts (last 7 days only)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const activeAlerts = ratingAlerts.filter(a => {
@@ -281,6 +393,9 @@ export default function DashboardManager() {
         return !dismissedAlerts.has(key) && new Date(a.date) >= sevenDaysAgo;
     });
 
+    // ──────────────────────────────────────────────────
+    // Render
+    // ──────────────────────────────────────────────────
     return (
         <div className="relative">
             <div className="relative z-10 space-y-8">
@@ -418,13 +533,10 @@ export default function DashboardManager() {
                     {/* Sidebar */}
                     <div className="xl:col-span-4 space-y-6">
                         <MarketBriefing news={recentNews} />
-
                         <EarningsCalendar earnings={earnings} />
-
                         <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-white/[0.1]">
                             <AnalystFeed consensus={consensus} />
                         </div>
-
                         <InsiderTradingTracker watchlist={watchlist} />
                     </div>
                 </div>

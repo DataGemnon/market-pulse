@@ -27,65 +27,39 @@ export async function summarizeStockNews(symbol: string, articles: { title: stri
     // For now, let's pass the top 10 articles to Claude
     const recentArticles = articles.slice(0, 10);
 
-    const articlesText = recentArticles.map(a => `- [${a.source}] ${a.title} (${a.publishedDate})`).join('\n');
+    const articlesText = recentArticles.map(a => `- [${a.source}] ${a.title}`).join('\n');
 
-    const prompt = `
-You are a financial news analyst. I will provide you with a list of recent news headlines for the stock "${symbol}".
-Your task is to:
-1. Identify the main story or theme driving the news.
-2. Synthesize these headlines into a SINGLE, concise headline summary (max 20 words).
-3. Determine the overall sentiment of this news for the stock: POSITIVE, NEUTRAL, or NEGATIVE.
+    const prompt = `You are a financial news analyst. Summarize the key story for ${symbol} based on these headlines.
 
-If the news is mixed, determine the dominant sentiment.
-If there are no significant stories, return a neutral summary.
-
-Format your response exactly as a JSON object:
-{
-  "summary": "Your concise headline here",
-  "sentiment": "POSITIVE" | "NEUTRAL" | "NEGATIVE"
-}
-
-News Headlines:
+Headlines:
 ${articlesText}
-`;
+
+Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation:
+{"summary":"One concise sentence (max 20 words) describing the main story.","sentiment":"POSITIVE"}
+
+sentiment must be exactly one of: POSITIVE, NEUTRAL, NEGATIVE`;
 
     try {
         const msg = await getClient().messages.create({
             model: 'claude-haiku-4-5',
-            max_tokens: 150,
+            max_tokens: 256,
             temperature: 0,
-            messages: [
-                { role: 'user', content: prompt }
-            ]
+            messages: [{ role: 'user', content: prompt }],
         });
 
-        const content = msg.content[0].type === 'text' ? msg.content[0].text : '';
+        const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
 
-        // Attempt to parse JSON
-        try {
-            const result = JSON.parse(content);
-            return {
-                symbol,
-                summary: result.summary,
-                sentiment: result.sentiment
-            };
-        } catch (e) {
-            // Fallback if JSON parsing fails (Claude usually follows instructions but just in case)
-            console.error('Failed to parse Claude response:', content);
-            return {
-                symbol,
-                summary: content.substring(0, 100) + '...', // Fallback
-                sentiment: 'NEUTRAL'
-            };
-        }
+        // Strip markdown code fences if present
+        const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error(`No JSON found: ${raw.slice(0, 100)}`);
+
+        const result = JSON.parse(jsonMatch[0]);
+        return { symbol, summary: result.summary, sentiment: result.sentiment };
 
     } catch (error) {
-        console.error('Error calling Claude API:', error);
-        return {
-            symbol,
-            summary: 'Unable to analyze news at this time.',
-            sentiment: 'NEUTRAL',
-        };
+        console.error('Error calling Claude API for stock summary:', error);
+        return { symbol, summary: 'Unable to analyze news at this time.', sentiment: 'NEUTRAL' };
     }
 }
 

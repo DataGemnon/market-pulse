@@ -31,7 +31,7 @@ Do not use introductory text like "Here are the points". Just the bullets.
 
         const msg = await anthropic.messages.create({
             model: "claude-haiku-4-5",
-            max_tokens: 150,
+            max_tokens: 256,
             temperature: 0.5,
             messages: [
                 { role: "user", content: prompt }

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { Activity, LogIn, LogOut, User, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { signOut } from '@/actions/auth';
 import AuthModal from '@/components/AuthModal';
+import WizardLogo from '@/components/WizardLogo';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 const Navbar = () => {
@@ -61,10 +62,9 @@ const Navbar = () => {
                     <div className="flex justify-between h-16 items-center">
                         {/* Logo */}
                         <div className="flex items-center">
-                            <Link href="/" className="flex items-center gap-3 group">
-                                <div className="relative p-2 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600 text-white shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 group-hover:scale-105 transition-all duration-300">
-                                    <Activity size={22} />
-                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl -z-10" />
+                            <Link href="/" className="flex items-center gap-2.5 group">
+                                <div className="group-hover:scale-105 group-hover:drop-shadow-[0_0_12px_rgba(168,85,247,0.6)] transition-all duration-300">
+                                    <WizardLogo size={36} />
                                 </div>
                                 <span className="font-black text-xl tracking-[0.15em] uppercase">
                                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
@@ -132,7 +132,7 @@ const Navbar = () => {
                                     <LogIn size={14} />
                                     <span className="hidden sm:block">Sign in</span>
                                     <span className="sm:hidden">
-                                        <User size={14} />
+                                        <LogIn size={14} />
                                     </span>
                                 </button>
                             )}

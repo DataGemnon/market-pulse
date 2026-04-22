@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, LogOut, ChevronDown } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { signOut } from '@/actions/auth';
 import AuthModal from '@/components/AuthModal';
 import WizardLogo from '@/components/WizardLogo';
@@ -17,6 +17,8 @@ const Navbar = () => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!isSupabaseConfigured) return;
+
         const supabase = createClient();
 
         // Get initial session

@@ -7,7 +7,7 @@ import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
 import { sendNotification } from '@/lib/notifications';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import {
     getWatchlistFromDB, saveWatchlistToDB, addSymbolToDB, removeSymbolFromDB,
     getPositionsFromDB, upsertPositionToDB, deletePositionFromDB,
@@ -100,6 +100,17 @@ export default function DashboardManager() {
     // Bootstrap: auth listener + initial data load
     // ──────────────────────────────────────────────────
     useEffect(() => {
+        // If Supabase isn't configured, load from localStorage only
+        if (!isSupabaseConfigured) {
+            const { wl, pos, alerts, dismissed } = readLocalStorage();
+            setWatchlist(wl);
+            setPositions(pos);
+            setPriceAlerts(alerts);
+            setDismissedAlerts(dismissed);
+            alerts.forEach((a: PriceAlert) => { if (a.triggered) notifiedAlertIds.current.add(a.id); });
+            return;
+        }
+
         const supabase = createClient();
 
         async function bootstrap(currentUser: User | null) {

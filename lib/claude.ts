@@ -106,63 +106,54 @@ export async function analyzeMarketImpact(news: GeneralNewsArticle[], events: Ec
     const highImpactEvents = events.filter(e => e.impact === 'High' || e.impact === 'Medium').slice(0, 5);
     const recentNews = news.slice(0, 10);
 
-    const dataContext = `
-    ECONOMIC EVENTS (Recent/Upcoming):
-    ${highImpactEvents.map(e => `- [${e.country}] ${e.event}: Actual=${e.actual}, Est=${e.estimate}, Impact=${e.impact}`).join('\n')}
+    const eventsText = highImpactEvents.length > 0
+        ? highImpactEvents.map(e => `- [${e.country}] ${e.event}: Actual=${e.actual ?? 'N/A'}, Est=${e.estimate ?? 'N/A'}, Impact=${e.impact}`).join('\n')
+        : '- No high-impact events today';
 
-    GENERAL NEWS HEADLINES:
-    ${recentNews.map(n => `- [${n.publishedDate}] ${n.title}`).join('\n')}
-    `;
+    const newsText = recentNews.length > 0
+        ? recentNews.map(n => `- ${n.title}`).join('\n')
+        : '- No headlines available';
 
-    const prompt = `
-    You are a senior Wall Street strategist. Your job is to tell a portfolio manager what SINGLE story is driving the market right now.
-    
-    Analyze the provided news and economic data.
-    Identify the "Narrative of the Day" - the one dominant theme moving stocks (e.g., "Fed Rate Cut Hopes", "Escalating Middle East Tensions", "Tech Earnings Miss").
-    
-    Then identify 2-3 supporting factors.
+    const prompt = `You are a senior Wall Street strategist. Analyze the market data below and identify the single dominant narrative driving markets today.
 
-    Output a JSON object with this structure:
-    {
-      "summary": "A punchy, professional 1-sentence summary of the market's main focus.",
-      "market_sentiment": "BULLISH" | "BEARISH" | "NEUTRAL",
-      "key_drivers": [
-        {
-          "title": "The Main Driver (The 'Narrative of the Day')",
-          "impact_level": "HIGH",
-          "category": "GEOPOLITICS" | "ECONOMY" | "POLICY" | "MARKET",
-          "description": "Why this is the #1 story today."
-        },
-        {
-          "title": "Supporting Factor 1",
-          "impact_level": "MEDIUM" | "HIGH",
-          "category": "...",
-          "description": "Brief explanation."
-        }
-      ]
-    }
+ECONOMIC EVENTS:
+${eventsText}
 
-    Data to Analyze:
-    ${dataContext}
-    `;
+NEWS HEADLINES:
+${newsText}
+
+Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation. Use this exact structure:
+{"summary":"One punchy sentence describing the main market driver today.","market_sentiment":"BULLISH","key_drivers":[{"title":"Main narrative title","impact_level":"HIGH","category":"ECONOMY","description":"Why this is the top story."},{"title":"Supporting factor","impact_level":"MEDIUM","category":"MARKET","description":"Brief explanation."}]}
+
+Rules:
+- market_sentiment must be exactly one of: BULLISH, BEARISH, NEUTRAL
+- impact_level must be exactly one of: HIGH, MEDIUM, LOW
+- category must be exactly one of: GEOPOLITICS, ECONOMY, POLICY, MARKET
+- Include 2 to 3 key_drivers
+- Output raw JSON only, nothing else`;
 
     try {
         const msg = await getClient().messages.create({
             model: 'claude-haiku-4-5',
-            max_tokens: 400,
+            max_tokens: 1024,
             temperature: 0,
-            messages: [
-                { role: 'user', content: prompt }
-            ]
+            messages: [{ role: 'user', content: prompt }],
         });
 
-        const content = msg.content[0].type === 'text' ? msg.content[0].text : '';
+        if (msg.stop_reason === 'max_tokens') {
+            console.warn('analyzeMarketImpact: response was truncated at max_tokens');
+        }
 
-        // Find JSON in content (sometimes Claude adds preamble)
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : content;
+        const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
 
-        return JSON.parse(jsonStr);
+        // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+        const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+        // Extract the first JSON object
+        const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error(`No JSON object found in response: ${raw.slice(0, 200)}`);
+
+        return JSON.parse(jsonMatch[0]);
 
     } catch (error) {
         console.error('Error analyzing market impact:', error);

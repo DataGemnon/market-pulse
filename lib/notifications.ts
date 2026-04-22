@@ -1,4 +1,4 @@
-// Browser notification helper for VEKTORA price alerts
+// Browser notification helper for Augur price alerts
 
 export function isNotificationSupported(): boolean {
     return typeof window !== 'undefined' && 'Notification' in window;

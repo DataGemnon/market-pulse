@@ -31,10 +31,10 @@ function formatCurrency(value: number, currency?: string): string {
 }
 
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
-const LS_WATCHLIST = 'vektora-watchlist';
-const LS_POSITIONS = 'vektora-positions';
-const LS_ALERTS = 'vektora-price-alerts';
-const LS_DISMISSED = 'vektora-dismissed-alerts';
+const LS_WATCHLIST = 'augur-watchlist';
+const LS_POSITIONS = 'augur-positions';
+const LS_ALERTS = 'augur-price-alerts';
+const LS_DISMISSED = 'augur-dismissed-alerts';
 
 export default function DashboardManager() {
     const [user, setUser] = useState<User | null>(null);

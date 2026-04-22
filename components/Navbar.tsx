@@ -68,9 +68,9 @@ const Navbar = () => {
                                 </div>
                                 <span className="font-black text-xl tracking-[0.15em] uppercase">
                                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-                                        VEKT
+                                        AUG
                                     </span>
-                                    <span className="text-white">ORA</span>
+                                    <span className="text-white">UR</span>
                                 </span>
                             </Link>
                         </div>

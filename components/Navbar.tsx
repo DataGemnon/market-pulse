@@ -68,21 +68,8 @@ const Navbar = () => {
                                 <div className="group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(34,211,238,0.5)] transition-all duration-300">
                                     <AugurLogo size={34} />
                                 </div>
-                                {/* Wordmark: chevron replaces the A */}
-                                <span className="font-black text-xl tracking-[0.12em] uppercase flex items-center">
-                                    <svg width="14" height="18" viewBox="0 0 14 18" fill="none" className="mr-[1px]">
-                                        <defs>
-                                            <linearGradient id="nav-chevron" x1="0" y1="0" x2="14" y2="18" gradientUnits="userSpaceOnUse">
-                                                <stop offset="0%" stopColor="#22d3ee" />
-                                                <stop offset="100%" stopColor="#a855f7" />
-                                            </linearGradient>
-                                        </defs>
-                                        {/* Bold right-pointing chevron ❯ */}
-                                        <path d="M2 2 L11 9 L2 16" stroke="url(#nav-chevron)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                                    </svg>
-                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-                                        UGUR
-                                    </span>
+                                <span className="font-black text-xl tracking-[0.2em] uppercase bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
+                                    AUGUR
                                 </span>
                             </Link>
                         </div>

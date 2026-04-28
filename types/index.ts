@@ -138,34 +138,6 @@ export interface SectorPerformance {
   price: number;
 }
 
-export interface InsiderTrade {
-  symbol: string;
-  filingDate: string;
-  transactionDate: string;
-  reportingName: string;
-  typeOfOwner: string;
-  acquistionOrDisposition: 'A' | 'D';
-  transactionType: string;
-  securitiesTransacted: number;
-  price: number;
-  securityName: string;
-  link: string;
-}
-
-export interface CongressionalTrade {
-  firstName: string;
-  lastName: string;
-  office: string;
-  link: string;
-  dateRecieved: string;
-  transactionDate: string;
-  owner: string;
-  assetDescription: string;
-  assetType: string;
-  type: string;
-  amount: string;
-  symbol: string;
-}
 
 export interface AnalystConsensus {
   symbol: string;

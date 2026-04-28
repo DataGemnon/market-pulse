@@ -1,4 +1,4 @@
-import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, InsiderTrade, CongressionalTrade, AnalystConsensus, RatingChange, UpcomingEarnings } from '@/types';
+import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, AnalystConsensus, RatingChange, UpcomingEarnings } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
@@ -591,62 +591,6 @@ export const getInternationalIndices = async (): Promise<MarketIndex[]> => {
         return results.filter((r): r is MarketIndex => r !== null);
     } catch (error) {
         console.error('Error fetching international indices:', error);
-        return [];
-    }
-};
-
-// --- Insider Trading ---
-
-export const getInsiderTrading = async (symbol: string, limit: number = 10): Promise<InsiderTrade[]> => {
-    try {
-        const data = await fetchFMP('/insider-trading', { symbol, limit: limit.toString() });
-        return data.map((item: any) => ({
-            symbol: item.symbol,
-            filingDate: item.filingDate,
-            transactionDate: item.transactionDate,
-            reportingName: item.reportingName,
-            typeOfOwner: item.typeOfOwner,
-            acquistionOrDisposition: item.acquistionOrDisposition,
-            transactionType: item.transactionType,
-            securitiesTransacted: item.securitiesTransacted,
-            price: item.price,
-            securityName: item.securityName,
-            link: item.link || '',
-        }));
-    } catch (error) {
-        console.error(`Error fetching insider trading for ${symbol}:`, error);
-        return [];
-    }
-};
-
-// --- Congressional Trading ---
-
-export const getCongressionalTrades = async (limit: number = 30): Promise<CongressionalTrade[]> => {
-    try {
-        // v4 RSS feed has current data; v3 /senate-trading is often empty
-        if (!API_KEY) throw new Error('API Key is missing');
-        const res = await fetch(
-            `https://financialmodelingprep.com/api/v4/senate-trading-rss-feed?page=0&apikey=${API_KEY}`,
-            { cache: 'no-store' }
-        );
-        if (!res.ok) throw new Error(`FMP v4 Error: ${res.status}`);
-        const data = await res.json();
-        return data.slice(0, limit).map((item: any) => ({
-            firstName: item.firstName,
-            lastName: item.lastName,
-            office: item.office,
-            link: item.link || '',
-            dateRecieved: item.dateRecieved,
-            transactionDate: item.transactionDate,
-            owner: item.owner,
-            assetDescription: item.assetDescription,
-            assetType: item.assetType,
-            type: item.type,
-            amount: item.amount,
-            symbol: item.symbol || '',
-        }));
-    } catch (error) {
-        console.error('Error fetching congressional trades:', error);
         return [];
     }
 };

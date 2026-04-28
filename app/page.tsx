@@ -6,12 +6,10 @@ import MarketOverview from '@/components/MarketOverview';
 import DashboardManager from '@/components/DashboardManager';
 import MarketImpactFeed from '@/components/MarketImpactFeed';
 import SectorHeatmap from '@/components/SectorHeatmap';
-import CongressionalTrading from '@/components/CongressionalTrading';
 import MarketCommentaryFeed from '@/components/MarketCommentaryFeed';
-import { getMarketIndices } from '@/lib/fmp';
-
 import AnalystDiscovery from '@/components/AnalystDiscovery';
 import InternationalIndices from '@/components/InternationalIndices';
+import { getMarketIndices } from '@/lib/fmp';
 
 export default async function Home() {
   const indices = await getMarketIndices();
@@ -31,12 +29,10 @@ export default async function Home() {
         <MarketOverview indices={indices} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-          {/* International Indices - smaller, below US overview */}
           <div className="mb-12">
             <InternationalIndices />
           </div>
 
-          {/* Sector Heatmap - prominent near top */}
           <div className="mb-16">
             <SectorHeatmap />
           </div>
@@ -45,18 +41,12 @@ export default async function Home() {
             <AnalystDiscovery />
           </div>
 
-          {/* AI-powered sections */}
           <div className="mb-12">
             <MarketImpactFeed />
           </div>
 
           <div className="mb-12">
             <MarketCommentaryFeed />
-          </div>
-
-          {/* Congressional Trading */}
-          <div className="mb-12">
-            <CongressionalTrading />
           </div>
 
           <DashboardManager />

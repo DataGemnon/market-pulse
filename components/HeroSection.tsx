@@ -1,14 +1,14 @@
 'use client';
 
-import { BarChart3, Brain, Shield, Zap } from 'lucide-react';
+import { BarChart3, Brain, Bell, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AugurBadge from '@/components/AugurBadge';
 
 const stats = [
-    { icon: BarChart3, label: 'Real-Time Data',    desc: 'Live quotes & indices' },
-    { icon: Brain,     label: 'AI Analysis',       desc: 'Claude-powered insights' },
-    { icon: Shield,    label: 'Insider Tracking',  desc: 'Congress & executives' },
-    { icon: Zap,       label: 'Smart Alerts',      desc: 'Analyst upgrades & news' },
+    { icon: BarChart3, label: 'Real-Time Data',   desc: 'Live quotes & indices' },
+    { icon: Brain,     label: 'AI Analysis',      desc: 'Claude-powered insights' },
+    { icon: Bell,      label: 'Smart Alerts',     desc: 'Price & analyst alerts' },
+    { icon: Zap,       label: 'Earnings Tracker', desc: 'Never miss a report' },
 ];
 
 const HeroSection = () => {
@@ -60,8 +60,8 @@ const HeroSection = () => {
                         transition={{ duration: 0.6, delay: 0.35 }}
                         className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed"
                     >
-                        AI-powered market intelligence combining real-time data, insider activity,
-                        and analyst insights — all in one dashboard.
+                        AI-powered market intelligence combining real-time data,
+                        analyst insights, and smart alerts — all in one dashboard.
                     </motion.p>
                 </div>
 

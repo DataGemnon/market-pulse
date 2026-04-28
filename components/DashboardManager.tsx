@@ -19,7 +19,6 @@ import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
-import InsiderTradingTracker from '@/components/InsiderTradingTracker';
 import EarningsCalendar from '@/components/EarningsCalendar';
 import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
@@ -548,7 +547,6 @@ export default function DashboardManager() {
                         <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-white/[0.1]">
                             <AnalystFeed consensus={consensus} />
                         </div>
-                        <InsiderTradingTracker watchlist={watchlist} />
                     </div>
                 </div>
             </div>

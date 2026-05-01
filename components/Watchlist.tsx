@@ -6,7 +6,6 @@ import { Fragment, useState } from 'react';
 import Sparkline from '@/components/Sparkline';
 import StockChart from '@/components/StockChart';
 import AlertModal from '@/components/AlertModal';
-import MetricTooltip from '@/components/MetricTooltip';
 
 function getCurrencySymbol(currency?: string): string {
     const c = currency || 'USD';
@@ -145,15 +144,9 @@ const Watchlist = ({ items, alerts, recaps, onAddSymbol, onRemoveSymbol, onSetPo
                         <tr className="border-b border-white/[0.06]">
                             <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Asset</th>
                             <th className="px-5 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">5D</th>
-                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                                Price<MetricTooltip term="Price" />
-                            </th>
-                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                                Change<MetricTooltip term="Change" />
-                            </th>
-                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">
-                                P&amp;L<MetricTooltip term="P&L" />
-                            </th>
+                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price</th>
+                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Change</th>
+                            <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">P&amp;L</th>
                             <th className="px-3 py-3 w-12"></th>
                             <th className="px-5 py-3 w-12"></th>
                         </tr>

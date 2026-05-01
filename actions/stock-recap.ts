@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export const RECAP_THRESHOLD = 1.5; // minimum % move to generate a recap
+const RECAP_THRESHOLD = 1.5; // minimum % move to generate a recap
 
 interface RecapInput {
     symbol: string;

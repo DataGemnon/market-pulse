@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Navbar from '@/components/Navbar';
+import Sidebar from '@/components/Sidebar';
 import HeroSection from '@/components/HeroSection';
 import MarketOverview from '@/components/MarketOverview';
 import DashboardManager from '@/components/DashboardManager';
@@ -25,44 +26,52 @@ export default async function Home() {
 
       <div className="relative z-10">
         <Navbar />
-        <HeroSection />
-        <MarketOverview indices={indices} />
+        <Sidebar />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+        {/* All page content shifted right on xl to make room for sidebar */}
+        <div className="xl:ml-52">
+          <HeroSection />
 
-          {/* ── Personal dashboard — first thing the user sees ── */}
-          <div id="dashboard" className="mb-16 scroll-mt-20">
-            <DashboardManager />
+          <div id="markets" className="scroll-mt-20">
+            <MarketOverview indices={indices} />
           </div>
 
-          {/* ── Divider ── */}
-          <div className="flex items-center gap-4 mb-12">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-600">Market Intelligence</span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
 
-          {/* ── Global market data ── */}
-          <div className="mb-12">
-            <InternationalIndices />
-          </div>
+            {/* ── Personal dashboard ── */}
+            <div id="dashboard" className="mb-16 scroll-mt-20">
+              <DashboardManager />
+            </div>
 
-          <div className="mb-16">
-            <SectorHeatmap />
-          </div>
+            {/* ── Divider ── */}
+            <div className="flex items-center gap-4 mb-12">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-600">Market Intelligence</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            </div>
 
-          <div className="mb-16">
-            <AnalystDiscovery />
-          </div>
+            {/* ── Global market data ── */}
+            <div id="international" className="mb-12 scroll-mt-20">
+              <InternationalIndices />
+            </div>
 
-          <div className="mb-12">
-            <MarketImpactFeed />
-          </div>
+            <div id="sectors" className="mb-16 scroll-mt-20">
+              <SectorHeatmap />
+            </div>
 
-          <div className="mb-12">
-            <MarketCommentaryFeed />
-          </div>
+            <div id="analyst" className="mb-16 scroll-mt-20">
+              <AnalystDiscovery />
+            </div>
 
+            <div id="impact" className="mb-12 scroll-mt-20">
+              <MarketImpactFeed />
+            </div>
+
+            <div id="voices" className="mb-12 scroll-mt-20">
+              <MarketCommentaryFeed />
+            </div>
+
+          </div>
         </div>
       </div>
     </main>

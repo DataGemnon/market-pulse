@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { LogIn, LogOut, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, ChevronDown, Sun } from 'lucide-react';
+import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { signOut } from '@/actions/auth';
 import AuthModal from '@/components/AuthModal';
@@ -53,6 +54,8 @@ const Navbar = () => {
         setSigningOut(false);
     };
 
+    const { enabled: briefEnabled, toggle: toggleBrief } = useMorningBriefPreference();
+
     const initials = user?.email
         ? user.email.slice(0, 2).toUpperCase()
         : '??';
@@ -84,6 +87,24 @@ const Navbar = () => {
                                 </span>
                                 Live
                             </div>
+
+                            {/* Morning Brief toggle */}
+                            <button
+                                onClick={toggleBrief}
+                                title={briefEnabled ? 'Turn off Morning Brief' : 'Turn on Morning Brief'}
+                                className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-all duration-200 ${
+                                    briefEnabled
+                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/15'
+                                        : 'bg-white/[0.03] border-white/[0.08] text-slate-600 hover:text-slate-400 hover:bg-white/[0.05]'
+                                }`}
+                            >
+                                <Sun size={12} className={briefEnabled ? 'text-amber-400' : 'text-slate-600'} />
+                                <span>Brief</span>
+                                {/* Toggle pill */}
+                                <div className={`relative w-7 h-4 rounded-full transition-colors duration-200 ${briefEnabled ? 'bg-amber-500/40' : 'bg-white/10'}`}>
+                                    <div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200 ${briefEnabled ? 'left-3.5 bg-amber-400' : 'left-0.5 bg-slate-600'}`} />
+                                </div>
+                            </button>
 
                             {/* Auth area */}
                             {user ? (

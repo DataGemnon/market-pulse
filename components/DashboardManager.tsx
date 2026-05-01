@@ -17,6 +17,8 @@ import {
     migrateLocalStorageToDB,
 } from '@/actions/db';
 import StockDiscovery from '@/components/StockDiscovery';
+import MorningBrief from '@/components/MorningBrief';
+import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -53,6 +55,7 @@ export default function DashboardManager() {
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
     const [stockRecaps, setStockRecaps] = useState<Record<string, string>>({});
     const [sentimentSummaries, setSentimentSummaries] = useState<Record<string, string>>({});
+    const { enabled: briefEnabled } = useMorningBriefPreference();
 
     // Track which alert IDs we've notified to avoid duplicate browser notifications
     const notifiedAlertIds = useRef<Set<string>>(new Set());
@@ -534,6 +537,9 @@ export default function DashboardManager() {
                         })}
                     </div>
                 )}
+
+                {/* Morning Brief */}
+                <MorningBrief watchlist={watchlist} enabled={briefEnabled} />
 
                 {/* Discover Investments */}
                 <StockDiscovery watchlist={watchlist} onAddSymbol={handleAddSymbol} />

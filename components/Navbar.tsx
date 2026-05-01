@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, LogOut, ChevronDown, Sun } from 'lucide-react';
 import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
+import { useMarketStatus } from '@/hooks/useMarketStatus';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { signOut } from '@/actions/auth';
 import AuthModal from '@/components/AuthModal';
@@ -55,6 +56,7 @@ const Navbar = () => {
     };
 
     const { enabled: briefEnabled, toggle: toggleBrief } = useMorningBriefPreference();
+    const { isOpen: marketOpen } = useMarketStatus();
 
     const initials = user?.email
         ? user.email.slice(0, 2).toUpperCase()
@@ -79,13 +81,19 @@ const Navbar = () => {
 
                         {/* Right side */}
                         <div className="flex items-center gap-3">
-                            {/* Live indicator */}
-                            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-slate-400">
+                            {/* Market status indicator */}
+                            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-colors duration-500 ${
+                                marketOpen
+                                    ? 'bg-white/[0.04] border-white/10 text-slate-400'
+                                    : 'bg-red-500/[0.07] border-red-500/15 text-red-400/80'
+                            }`}>
                                 <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                    {marketOpen && (
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    )}
+                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${marketOpen ? 'bg-emerald-500' : 'bg-red-500'}`} />
                                 </span>
-                                Live
+                                {marketOpen ? 'Market Open' : 'Market Closed'}
                             </div>
 
                             {/* Morning Brief toggle */}

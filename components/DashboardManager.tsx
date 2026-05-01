@@ -6,6 +6,8 @@ import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
+import { getBatchStockRecaps } from '@/actions/stock-recap';
+import { getBatchSentimentSummaries } from '@/actions/analyst-sentiment';
 import { sendNotification } from '@/lib/notifications';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import {
@@ -48,6 +50,8 @@ export default function DashboardManager() {
     const [consensus, setConsensus] = useState<AnalystConsensus[]>([]);
     const [ratingAlerts, setRatingAlerts] = useState<RatingChange[]>([]);
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+    const [stockRecaps, setStockRecaps] = useState<Record<string, string>>({});
+    const [sentimentSummaries, setSentimentSummaries] = useState<Record<string, string>>({});
 
     // Track which alert IDs we've notified to avoid duplicate browser notifications
     const notifiedAlertIds = useRef<Set<string>>(new Set());
@@ -194,6 +198,7 @@ export default function DashboardManager() {
             const now = new Date();
             const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+            const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
 
             const recent: NewsArticle[] = [];
             const missed: NewsArticle[] = [];
@@ -207,6 +212,17 @@ export default function DashboardManager() {
             setMissedNews(missed);
             setConsensus(consensusRes);
             setRatingAlerts(ratingChanges);
+
+            // ── Non-blocking: generate "What happened today?" recaps ──
+            const newsMap: Record<string, string[]> = {};
+            newsResults.forEach(article => {
+                if (!article.symbol) return;
+                if (new Date(article.publishedDate) < todayStart) return;
+                if (!newsMap[article.symbol]) newsMap[article.symbol] = [];
+                newsMap[article.symbol].push(article.title);
+            });
+            getBatchStockRecaps(batchQuotes, newsMap).then(setStockRecaps).catch(() => {});
+            getBatchSentimentSummaries(consensusRes).then(setSentimentSummaries).catch(() => {});
         };
 
         fetchData();
@@ -523,6 +539,7 @@ export default function DashboardManager() {
                     <Watchlist
                         items={watchlistItems}
                         alerts={priceAlerts}
+                        recaps={stockRecaps}
                         onAddSymbol={handleAddSymbol}
                         onRemoveSymbol={handleRemoveSymbol}
                         onSetPosition={handleSetPosition}
@@ -545,7 +562,7 @@ export default function DashboardManager() {
                         <MarketBriefing news={recentNews} />
                         <EarningsCalendar earnings={earnings} />
                         <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden transition-all duration-300 hover:border-white/[0.1]">
-                            <AnalystFeed consensus={consensus} />
+                            <AnalystFeed consensus={consensus} summaries={sentimentSummaries} />
                         </div>
                     </div>
                 </div>

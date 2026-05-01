@@ -30,6 +30,7 @@ function formatCurrency(value: number, currency?: string): string {
 interface WatchlistProps {
     items: WatchlistItem[];
     alerts: PriceAlert[];
+    recaps?: Record<string, string>;
     onAddSymbol: (symbol: string) => void;
     onRemoveSymbol: (symbol: string) => void;
     onSetPosition: (symbol: string, position: Position | null) => void;
@@ -37,7 +38,7 @@ interface WatchlistProps {
     onRemoveAlert: (alertId: string) => void;
 }
 
-const Watchlist = ({ items, alerts, onAddSymbol, onRemoveSymbol, onSetPosition, onAddAlert, onRemoveAlert }: WatchlistProps) => {
+const Watchlist = ({ items, alerts, recaps, onAddSymbol, onRemoveSymbol, onSetPosition, onAddAlert, onRemoveAlert }: WatchlistProps) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newSymbol, setNewSymbol] = useState('');
     const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
@@ -178,6 +179,16 @@ const Watchlist = ({ items, alerts, onAddSymbol, onRemoveSymbol, onSetPosition, 
                                                         <ChevronDown size={12} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                     </div>
                                                     <div className="text-xs text-slate-500 truncate max-w-[100px]">{item.name}</div>
+                                                    {recaps?.[item.symbol] && Math.abs(item.changesPercentage) >= 1.5 && (
+                                                        <div
+                                                            className={`text-[10px] mt-0.5 max-w-[200px] italic leading-tight truncate ${
+                                                                item.changesPercentage >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'
+                                                            }`}
+                                                            title={recaps[item.symbol]}
+                                                        >
+                                                            {recaps[item.symbol]}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>

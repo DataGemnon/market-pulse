@@ -26,6 +26,29 @@ const fetchFMP = async (endpoint: string, params: Record<string, string> = {}) =
     return res.json();
 };
 
+export interface StockSearchResult {
+    symbol: string;
+    name: string;
+    exchange: string;
+    currency: string;
+}
+
+export const searchStocks = async (query: string): Promise<StockSearchResult[]> => {
+    if (!query || query.length < 1) return [];
+    try {
+        const data = await fetchFMP('/search', { query, limit: '10' });
+        if (!Array.isArray(data)) return [];
+        return data.map((item: Record<string, string>) => ({
+            symbol: item.symbol,
+            name: item.name,
+            exchange: item.exchangeShortName || item.stockExchange || '',
+            currency: item.currency || 'USD',
+        }));
+    } catch {
+        return [];
+    }
+};
+
 export const getMarketIndices = async (): Promise<MarketIndex[]> => {
     try {
         // Fetch major indices using the quotes endpoint

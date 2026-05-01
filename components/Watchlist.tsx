@@ -1,11 +1,12 @@
 'use client';
 
 import { Position, PriceAlert, WatchlistItem } from '@/types';
-import { Plus, TrendingUp, TrendingDown, Trash2, X, Check, ChevronDown, Briefcase, Edit3, Bell } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Plus, TrendingUp, TrendingDown, Trash2, X, ChevronDown, Briefcase, Edit3, Bell, Search, Loader2 } from 'lucide-react';
+import { Fragment, useState, useEffect, useRef, useCallback } from 'react';
 import Sparkline from '@/components/Sparkline';
 import StockChart from '@/components/StockChart';
 import AlertModal from '@/components/AlertModal';
+import { searchStocksAction, type StockSearchResult } from '@/actions/quotes';
 
 function getCurrencySymbol(currency?: string): string {
     const c = currency || 'USD';
@@ -40,17 +41,61 @@ interface WatchlistProps {
 
 const Watchlist = ({ items, alerts, recaps, onAddSymbol, onRemoveSymbol, onSetPosition, onAddAlert, onRemoveAlert }: WatchlistProps) => {
     const [isAdding, setIsAdding] = useState(false);
-    const [newSymbol, setNewSymbol] = useState('');
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState<StockSearchResult[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [activeIdx, setActiveIdx] = useState(-1);
     const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
     const [editingPosition, setEditingPosition] = useState<WatchlistItem | null>(null);
     const [editingAlerts, setEditingAlerts] = useState<WatchlistItem | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleAddSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newSymbol.trim()) {
-            onAddSymbol(newSymbol.trim());
-            setNewSymbol('');
-            setIsAdding(false);
+    // Debounced search
+    useEffect(() => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        if (query.trim().length < 1) { setResults([]); setSearching(false); return; }
+        setSearching(true);
+        debounceTimer.current = setTimeout(async () => {
+            try {
+                const res = await searchStocksAction(query.trim());
+                setResults(res);
+            } catch {
+                setResults([]);
+            } finally {
+                setSearching(false);
+            }
+        }, 300);
+    }, [query]);
+
+    const closeAdd = useCallback(() => {
+        setIsAdding(false);
+        setQuery('');
+        setResults([]);
+        setActiveIdx(-1);
+    }, []);
+
+    const pickResult = useCallback((symbol: string) => {
+        onAddSymbol(symbol);
+        closeAdd();
+    }, [onAddSymbol, closeAdd]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') { closeAdd(); return; }
+        if (results.length === 0) {
+            if (e.key === 'Enter' && query.trim()) {
+                e.preventDefault();
+                pickResult(query.trim().toUpperCase());
+            }
+            return;
+        }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, -1)); }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIdx >= 0) pickResult(results[activeIdx].symbol);
+            else if (query.trim()) pickResult(query.trim().toUpperCase());
         }
     };
 
@@ -113,29 +158,76 @@ const Watchlist = ({ items, alerts, recaps, onAddSymbol, onRemoveSymbol, onSetPo
             )}
 
             {isAdding && (
-                <form onSubmit={handleAddSubmit} className="p-4 bg-white/[0.02] border-b border-white/[0.06] flex gap-2">
-                    <input
-                        type="text"
-                        value={newSymbol}
-                        onChange={(e) => setNewSymbol(e.target.value)}
-                        placeholder="e.g. MSFT, MC.PA, SAP.DE"
-                        className="flex-1 px-3 py-2 text-sm bg-white/[0.05] border border-white/[0.1] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 text-white placeholder-slate-500 uppercase"
-                        autoFocus
-                    />
-                    <button
-                        type="submit"
-                        className="p-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition-colors"
-                    >
-                        <Check size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setIsAdding(false)}
-                        className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                        <X size={16} />
-                    </button>
-                </form>
+                <div className="p-4 bg-white/[0.02] border-b border-white/[0.06]">
+                    <div className="relative flex gap-2">
+                        <div className="relative flex-1">
+                            {/* Search icon */}
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                {searching
+                                    ? <Loader2 size={14} className="text-slate-500 animate-spin" />
+                                    : <Search size={14} className="text-slate-500" />
+                                }
+                            </span>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={query}
+                                onChange={(e) => { setQuery(e.target.value); setActiveIdx(-1); }}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Search by name or ticker — e.g. Apple, TSLA…"
+                                className="w-full pl-9 pr-3 py-2 text-sm bg-white/[0.05] border border-white/[0.1] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 text-white placeholder-slate-500"
+                                autoFocus
+                            />
+
+                            {/* Dropdown */}
+                            {(results.length > 0 || (query.length > 0 && !searching)) && (
+                                <div
+                                    ref={dropdownRef}
+                                    className="absolute left-0 right-0 top-full mt-1.5 bg-[#0f0f1a] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 overflow-hidden z-50"
+                                >
+                                    {results.length === 0 && query.length > 0 && !searching && (
+                                        <div className="px-4 py-3 text-sm text-slate-500">
+                                            No results — try entering the ticker directly (e.g. MC.PA)
+                                        </div>
+                                    )}
+                                    {results.map((r, i) => (
+                                        <button
+                                            key={r.symbol}
+                                            type="button"
+                                            onMouseDown={(e) => { e.preventDefault(); pickResult(r.symbol); }}
+                                            onMouseEnter={() => setActiveIdx(i)}
+                                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                                                activeIdx === i ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'
+                                            }`}
+                                        >
+                                            {/* Symbol badge */}
+                                            <div className="w-10 h-8 flex-shrink-0 rounded-md bg-gradient-to-br from-cyan-500/15 to-purple-500/15 border border-white/[0.06] flex items-center justify-center font-bold text-[10px] text-cyan-400">
+                                                {r.symbol.slice(0, 4)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-white">{r.symbol}</span>
+                                                    <span className="text-[10px] font-medium text-slate-600 bg-white/[0.05] px-1.5 py-0.5 rounded">
+                                                        {r.exchange}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-400 truncate">{r.name}</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={closeAdd}
+                            className="p-2 text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
             )}
 
             <div className="overflow-x-auto">

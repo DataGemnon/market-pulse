@@ -71,8 +71,8 @@ const Navbar = () => {
                                 <div className="group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(34,211,238,0.5)] transition-all duration-300">
                                     <AugurLogo size={34} />
                                 </div>
-                                <span className="font-black text-xl tracking-[0.2em] uppercase bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
-                                    AUGUR
+                                <span className="font-black text-lg tracking-[0.12em] bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
+                                    augur
                                 </span>
                             </Link>
                         </div>

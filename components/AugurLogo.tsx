@@ -3,7 +3,8 @@ interface AugurLogoProps {
     className?: string;
 }
 
-export default function AugurLogo({ size = 36, className }: AugurLogoProps) {
+export default function AugurLogo({ size = 34, className }: AugurLogoProps) {
+    // Three signal arcs rising from a focal point — compact navbar version
     return (
         <svg
             width={size}
@@ -14,30 +15,37 @@ export default function AugurLogo({ size = 36, className }: AugurLogoProps) {
             className={className}
         >
             <defs>
-                <linearGradient id="aug-orb" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#22d3ee" />
-                    <stop offset="100%" stopColor="#a855f7" />
+                <linearGradient id="al-arc" x1="18" y1="33" x2="18" y2="6" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%"   stopColor="#22d3ee" />
+                    <stop offset="55%"  stopColor="#a855f7" />
+                    <stop offset="100%" stopColor="#ec4899" />
                 </linearGradient>
+                <filter id="al-glow" x="-80%" y="-80%" width="260%" height="260%">
+                    <feGaussianBlur stdDeviation="1.5" result="b" />
+                    <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
             </defs>
 
-            {/* Three orbital ellipses — 0°, 60°, 120° */}
-            <ellipse
-                cx="18" cy="18" rx="16.5" ry="6"
-                stroke="url(#aug-orb)" strokeWidth="1.4" fill="none"
-            />
-            <ellipse
-                cx="18" cy="18" rx="16.5" ry="6"
-                stroke="url(#aug-orb)" strokeWidth="1.4" fill="none"
-                transform="rotate(60 18 18)"
-            />
-            <ellipse
-                cx="18" cy="18" rx="16.5" ry="6"
-                stroke="url(#aug-orb)" strokeWidth="1.4" fill="none"
-                transform="rotate(120 18 18)"
-            />
+            {/* Inner arc */}
+            <path d="M 12,32 A 6,6 0 0,1 24,32"
+                stroke="url(#al-arc)" strokeWidth="2.2" strokeLinecap="round" opacity="0.45" />
 
-            {/* Nucleus */}
-            <circle cx="18" cy="18" r="2.8" fill="url(#aug-orb)" />
+            {/* Middle arc */}
+            <path d="M 7,32 A 11,11 0 0,1 29,32"
+                stroke="url(#al-arc)" strokeWidth="1.9" strokeLinecap="round" opacity="0.7" />
+
+            {/* Outer arc */}
+            <path d="M 2,32 A 16,16 0 0,1 34,32"
+                stroke="url(#al-arc)" strokeWidth="1.6" strokeLinecap="round" />
+
+            {/* Focal point glow */}
+            <circle cx="18" cy="32" r="4" fill="url(#al-arc)" opacity="0.15" />
+            <circle cx="18" cy="32" r="2.2" fill="url(#al-arc)" filter="url(#al-glow)" />
+            <circle cx="18" cy="32" r="1"   fill="white" opacity="0.95" />
+
+            {/* Outer arc endpoint dots */}
+            <circle cx="2"  cy="32" r="1.4" fill="#22d3ee" opacity="0.55" />
+            <circle cx="34" cy="32" r="1.4" fill="#ec4899" opacity="0.55" />
         </svg>
     );
 }

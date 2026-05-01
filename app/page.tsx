@@ -29,6 +29,20 @@ export default async function Home() {
         <MarketOverview indices={indices} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+
+          {/* ── Personal dashboard — first thing the user sees ── */}
+          <div id="dashboard" className="mb-16 scroll-mt-20">
+            <DashboardManager />
+          </div>
+
+          {/* ── Divider ── */}
+          <div className="flex items-center gap-4 mb-12">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-600">Market Intelligence</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </div>
+
+          {/* ── Global market data ── */}
           <div className="mb-12">
             <InternationalIndices />
           </div>
@@ -49,7 +63,6 @@ export default async function Home() {
             <MarketCommentaryFeed />
           </div>
 
-          <DashboardManager />
         </div>
       </div>
     </main>

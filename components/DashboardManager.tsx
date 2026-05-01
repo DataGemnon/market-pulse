@@ -18,14 +18,17 @@ import {
 } from '@/actions/db';
 import StockDiscovery from '@/components/StockDiscovery';
 import MorningBrief from '@/components/MorningBrief';
+import EarningsPreviewPanel from '@/components/EarningsPreviewPanel';
 import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
+import { getEarningsPreviews, type EarningsPreviewResult } from '@/actions/earnings-preview';
+import { getPersonalImpact, type PersonalImpactResult } from '@/actions/personal-impact';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import EarningsCalendar from '@/components/EarningsCalendar';
-import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
 function formatCurrency(value: number, currency?: string): string {
@@ -55,6 +58,10 @@ export default function DashboardManager() {
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
     const [stockRecaps, setStockRecaps] = useState<Record<string, string>>({});
     const [sentimentSummaries, setSentimentSummaries] = useState<Record<string, string>>({});
+    const [earningsPreviews, setEarningsPreviews] = useState<EarningsPreviewResult[]>([]);
+    const [earningsPreviewLoading, setEarningsPreviewLoading] = useState(false);
+    const [personalImpact, setPersonalImpact] = useState<PersonalImpactResult | null>(null);
+    const [impactDismissed, setImpactDismissed] = useState(false);
     const { enabled: briefEnabled } = useMorningBriefPreference();
 
     // Track which alert IDs we've notified to avoid duplicate browser notifications
@@ -227,6 +234,19 @@ export default function DashboardManager() {
             });
             getBatchStockRecaps(batchQuotes, newsMap).then(setStockRecaps).catch(() => {});
             getBatchSentimentSummaries(consensusRes).then(setSentimentSummaries).catch(() => {});
+
+            // ── Non-blocking: earnings preview for today/tomorrow ──
+            if (earningsRes.length > 0) {
+                setEarningsPreviewLoading(true);
+                getEarningsPreviews(earningsRes)
+                    .then(setEarningsPreviews)
+                    .catch(() => {})
+                    .finally(() => setEarningsPreviewLoading(false));
+            }
+
+            // ── Non-blocking: personalized market impact ──
+            setImpactDismissed(false);
+            getPersonalImpact(batchQuotes).then(setPersonalImpact).catch(() => {});
         };
 
         fetchData();
@@ -538,8 +558,51 @@ export default function DashboardManager() {
                     </div>
                 )}
 
+                {/* Personalized Market Impact */}
+                {personalImpact && !impactDismissed && (
+                    <div
+                        className={`flex items-start gap-3 p-4 rounded-2xl border animate-in fade-in slide-in-from-top-2 ${
+                            personalImpact.severity === 'positive'
+                                ? 'bg-emerald-500/[0.06] border-emerald-500/20'
+                                : personalImpact.severity === 'negative'
+                                ? 'bg-red-500/[0.06] border-red-500/20'
+                                : 'bg-cyan-500/[0.06] border-cyan-500/15'
+                        }`}
+                    >
+                        <div
+                            className={`p-2 rounded-lg flex-shrink-0 ${
+                                personalImpact.severity === 'positive'
+                                    ? 'bg-emerald-500/15 text-emerald-400'
+                                    : personalImpact.severity === 'negative'
+                                    ? 'bg-red-500/15 text-red-400'
+                                    : 'bg-cyan-500/15 text-cyan-400'
+                            }`}
+                        >
+                            <Sparkles size={15} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                What this means for you
+                            </p>
+                            <p className="text-sm text-slate-200 leading-relaxed">{personalImpact.brief}</p>
+                        </div>
+                        <button
+                            onClick={() => setImpactDismissed(true)}
+                            className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                        >
+                            <X size={13} />
+                        </button>
+                    </div>
+                )}
+
                 {/* Morning Brief */}
                 <MorningBrief watchlist={watchlist} enabled={briefEnabled} />
+
+                {/* Earnings Preview */}
+                <EarningsPreviewPanel
+                    previews={earningsPreviews}
+                    loading={earningsPreviewLoading}
+                />
 
                 {/* Discover Investments */}
                 <StockDiscovery watchlist={watchlist} onAddSymbol={handleAddSymbol} />

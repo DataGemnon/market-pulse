@@ -16,6 +16,7 @@ import {
     getAlertsFromDB, insertAlertToDB, updateAlertInDB, deleteAlertFromDB,
     migrateLocalStorageToDB,
 } from '@/actions/db';
+import StockDiscovery from '@/components/StockDiscovery';
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -533,6 +534,9 @@ export default function DashboardManager() {
                         })}
                     </div>
                 )}
+
+                {/* Discover Investments */}
+                <StockDiscovery watchlist={watchlist} onAddSymbol={handleAddSymbol} />
 
                 {/* Top: Watchlist */}
                 <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] overflow-hidden">

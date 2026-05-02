@@ -3,7 +3,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { StockQuote } from '@/types';
 
-const anthropic = new Anthropic();
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export interface PersonalImpactResult {
     brief: string;

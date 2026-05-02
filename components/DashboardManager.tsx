@@ -6,8 +6,26 @@ import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
-import { getBatchStockRecaps } from '@/actions/stock-recap';
-import { getBatchSentimentSummaries } from '@/actions/analyst-sentiment';
+// AI calls go via API routes (more reliable on Vercel than server actions)
+async function fetchStockRecaps(quotes: StockQuote[], newsMap: Record<string, string[]>): Promise<Record<string, string>> {
+    const res = await fetch('/api/stock-recap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quotes, newsMap }),
+    });
+    if (!res.ok) return {};
+    return res.json();
+}
+
+async function fetchSentimentSummaries(consensus: AnalystConsensus[]): Promise<Record<string, string>> {
+    const res = await fetch('/api/sentiment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consensus }),
+    });
+    if (!res.ok) return {};
+    return res.json();
+}
 import { sendNotification } from '@/lib/notifications';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import {
@@ -20,8 +38,28 @@ import StockDiscovery from '@/components/StockDiscovery';
 import MorningBrief from '@/components/MorningBrief';
 import EarningsPreviewPanel from '@/components/EarningsPreviewPanel';
 import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
-import { getEarningsPreviews, type EarningsPreviewResult } from '@/actions/earnings-preview';
-import { getPersonalImpact, type PersonalImpactResult } from '@/actions/personal-impact';
+import type { EarningsPreviewResult } from '@/actions/earnings-preview';
+import type { PersonalImpactResult } from '@/actions/personal-impact';
+
+async function fetchEarningsPreviews(earnings: UpcomingEarnings[]): Promise<EarningsPreviewResult[]> {
+    const res = await fetch('/api/earnings-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ earnings }),
+    });
+    if (!res.ok) return [];
+    return res.json();
+}
+
+async function fetchPersonalImpact(quotes: StockQuote[]): Promise<PersonalImpactResult | null> {
+    const res = await fetch('/api/personal-impact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quotes }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
@@ -232,13 +270,13 @@ export default function DashboardManager() {
                 if (!newsMap[article.symbol]) newsMap[article.symbol] = [];
                 newsMap[article.symbol].push(article.title);
             });
-            getBatchStockRecaps(batchQuotes, newsMap).then(setStockRecaps).catch(() => {});
-            getBatchSentimentSummaries(consensusRes).then(setSentimentSummaries).catch(() => {});
+            fetchStockRecaps(batchQuotes, newsMap).then(setStockRecaps).catch(() => {});
+            fetchSentimentSummaries(consensusRes).then(setSentimentSummaries).catch(() => {});
 
             // ── Non-blocking: earnings preview for today/tomorrow ──
             if (earningsRes.length > 0) {
                 setEarningsPreviewLoading(true);
-                getEarningsPreviews(earningsRes)
+                fetchEarningsPreviews(earningsRes)
                     .then(setEarningsPreviews)
                     .catch(() => {})
                     .finally(() => setEarningsPreviewLoading(false));
@@ -246,7 +284,7 @@ export default function DashboardManager() {
 
             // ── Non-blocking: personalized market impact ──
             setImpactDismissed(false);
-            getPersonalImpact(batchQuotes).then(setPersonalImpact).catch(() => {});
+            fetchPersonalImpact(batchQuotes).then(setPersonalImpact).catch(() => {});
         };
 
         fetchData();

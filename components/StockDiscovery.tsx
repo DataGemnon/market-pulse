@@ -2,7 +2,23 @@
 
 import { useState, useRef } from 'react';
 import { Search, Plus, Check, Loader2, Sparkles, X, ArrowRight } from 'lucide-react';
-import { discoverStocks, DiscoveryResult } from '@/actions/stock-discovery';
+
+export interface DiscoveryResult {
+    symbol: string;
+    name: string;
+    what: string;
+    fit: string;
+}
+
+async function discoverStocks(query: string): Promise<DiscoveryResult[]> {
+    const res = await fetch('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
 
 interface StockDiscoveryProps {
     watchlist: string[];

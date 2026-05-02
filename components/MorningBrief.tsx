@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { getMorningBrief } from '@/actions/morning-brief';
+
+async function getMorningBrief(watchlist: string[]): Promise<string | null> {
+    const res = await fetch('/api/morning-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watchlist }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.brief ?? null;
+}
 
 interface MorningBriefProps {
     watchlist: string[];

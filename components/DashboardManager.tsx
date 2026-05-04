@@ -1,31 +1,20 @@
 'use client';
 
+// ── React & types ──────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
+
+// ── Data types ─────────────────────────────────────────────────────────────
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings, PriceAlert } from '@/types';
+import type { EarningsPreviewResult } from '@/actions/earnings-preview';
+import type { PersonalImpactResult } from '@/actions/personal-impact';
+
+// ── Data actions (server actions — non-AI, proven reliable) ───────────────
 import { getMarketNews } from '@/lib/fmp';
 import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
-// AI calls go via API routes (more reliable on Vercel than server actions)
-async function fetchStockRecaps(quotes: StockQuote[], newsMap: Record<string, string[]>): Promise<Record<string, string>> {
-    const res = await fetch('/api/stock-recap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quotes, newsMap }),
-    });
-    if (!res.ok) return {};
-    return res.json();
-}
-
-async function fetchSentimentSummaries(consensus: AnalystConsensus[]): Promise<Record<string, string>> {
-    const res = await fetch('/api/sentiment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consensus }),
-    });
-    if (!res.ok) return {};
-    return res.json();
-}
 import { sendNotification } from '@/lib/notifications';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import {
@@ -34,40 +23,38 @@ import {
     getAlertsFromDB, insertAlertToDB, updateAlertInDB, deleteAlertFromDB,
     migrateLocalStorageToDB,
 } from '@/actions/db';
+
+// ── Components ─────────────────────────────────────────────────────────────
 import StockDiscovery from '@/components/StockDiscovery';
 import MorningBrief from '@/components/MorningBrief';
 import EarningsPreviewPanel from '@/components/EarningsPreviewPanel';
-import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
-import type { EarningsPreviewResult } from '@/actions/earnings-preview';
-import type { PersonalImpactResult } from '@/actions/personal-impact';
-
-async function fetchEarningsPreviews(earnings: UpcomingEarnings[]): Promise<EarningsPreviewResult[]> {
-    const res = await fetch('/api/earnings-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ earnings }),
-    });
-    if (!res.ok) return [];
-    return res.json();
-}
-
-async function fetchPersonalImpact(quotes: StockQuote[]): Promise<PersonalImpactResult | null> {
-    const res = await fetch('/api/personal-impact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quotes }),
-    });
-    if (!res.ok) return null;
-    return res.json();
-}
 import NewsFeed from '@/components/NewsFeed';
 import StockSmartFeed from '@/components/StockSmartFeed';
 import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import EarningsCalendar from '@/components/EarningsCalendar';
-import { TrendingUp, TrendingDown, Bell, BellRing, X, ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
+
+// ── Hooks ──────────────────────────────────────────────────────────────────
+import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
+
+// ── AI helpers via API routes (server actions were failing on Vercel) ──────
+async function fetchStockRecaps(quotes: StockQuote[], newsMap: Record<string, string[]>): Promise<Record<string, string>> {
+    const res = await fetch('/api/stock-recap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quotes, newsMap }) });
+    return res.ok ? res.json() : {};
+}
+async function fetchSentimentSummaries(consensus: AnalystConsensus[]): Promise<Record<string, string>> {
+    const res = await fetch('/api/sentiment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consensus }) });
+    return res.ok ? res.json() : {};
+}
+async function fetchEarningsPreviews(earnings: UpcomingEarnings[]): Promise<EarningsPreviewResult[]> {
+    const res = await fetch('/api/earnings-preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ earnings }) });
+    return res.ok ? res.json() : [];
+}
+async function fetchPersonalImpact(quotes: StockQuote[]): Promise<PersonalImpactResult | null> {
+    const res = await fetch('/api/personal-impact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quotes }) });
+    return res.ok ? res.json() : null;
+}
 
 function formatCurrency(value: number, currency?: string): string {
     const c = currency || 'USD';

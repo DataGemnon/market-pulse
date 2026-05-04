@@ -2,14 +2,7 @@
 
 import { getMarketNews } from '@/lib/fmp';
 import { summarizeStockNews } from '@/lib/claude';
-import { NewsArticle } from '@/types';
-
-export interface SmartNewsResult {
-    symbol: string;
-    summary: string;
-    sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
-    articles: NewsArticle[];
-}
+import { NewsArticle, SmartNewsResult } from '@/types';
 
 export async function getSmartNewsForStock(symbol: string): Promise<SmartNewsResult | null> {
     try {

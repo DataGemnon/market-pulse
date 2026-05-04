@@ -1,17 +1,9 @@
 'use server';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { UpcomingEarnings } from '@/types';
+import { UpcomingEarnings, EarningsPreviewResult } from '@/types';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-export interface EarningsPreviewResult {
-    symbol: string;
-    name: string;
-    date: string;
-    time: string; // 'bmo' | 'amc' | ''
-    preview: string;
-}
 
 function dayOffset(dateStr: string): number {
     const today = new Date();

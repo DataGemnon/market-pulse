@@ -7,8 +7,7 @@ import type { User } from '@supabase/supabase-js';
 
 // ── Data types ─────────────────────────────────────────────────────────────
 import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange, Position, UpcomingEarnings, PriceAlert } from '@/types';
-import type { EarningsPreviewResult } from '@/actions/earnings-preview';
-import type { PersonalImpactResult } from '@/actions/personal-impact';
+import type { EarningsPreviewResult, PersonalImpactResult } from '@/types';
 
 // ── Data actions (server actions — non-AI, proven reliable) ───────────────
 import { getMarketNews } from '@/lib/fmp';

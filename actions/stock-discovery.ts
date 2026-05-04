@@ -1,15 +1,9 @@
 'use server';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { DiscoveryResult } from '@/types';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-export interface DiscoveryResult {
-    symbol: string;
-    name: string;
-    what: string; // what the company does, plain English ≤12 words
-    fit: string;  // why it matches the query, plain English ≤12 words
-}
 
 export async function discoverStocks(query: string): Promise<DiscoveryResult[]> {
     if (!query.trim()) return [];

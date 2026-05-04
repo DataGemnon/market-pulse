@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarClock, Sunrise, Moon, Clock } from 'lucide-react';
-import type { EarningsPreviewResult } from '@/actions/earnings-preview';
+import type { EarningsPreviewResult } from '@/types';
 
 interface EarningsPreviewPanelProps {
     previews: EarningsPreviewResult[];

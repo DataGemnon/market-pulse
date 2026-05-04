@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { SmartNewsResult, getSmartNewsForStock } from '@/actions/ai-news';
+import type { SmartNewsResult } from '@/types';
+import { getSmartNewsForStock } from '@/actions/ai-news';
 import { Loader2, ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

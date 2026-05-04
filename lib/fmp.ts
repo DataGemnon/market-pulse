@@ -26,14 +26,7 @@ const fetchFMP = async (endpoint: string, params: Record<string, string> = {}) =
     return res.json();
 };
 
-export interface StockSearchResult {
-    symbol: string;
-    name: string;
-    exchange: string;
-    currency: string;
-}
-
-export const searchStocks = async (query: string): Promise<StockSearchResult[]> => {
+export const searchStocks = async (query: string): Promise<import('@/types').StockSearchResult[]> => {
     if (!query || query.length < 1) return [];
     try {
         const data = await fetchFMP('/search', { query, limit: '10' });

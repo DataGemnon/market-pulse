@@ -6,7 +6,8 @@ import { Fragment, useState, useEffect, useRef, useCallback } from 'react';
 import Sparkline from '@/components/Sparkline';
 import StockChart from '@/components/StockChart';
 import AlertModal from '@/components/AlertModal';
-import { searchStocksAction, type StockSearchResult } from '@/actions/quotes';
+import { searchStocksAction } from '@/actions/quotes';
+import type { StockSearchResult } from '@/types';
 
 function getCurrencySymbol(currency?: string): string {
     const c = currency || 'USD';

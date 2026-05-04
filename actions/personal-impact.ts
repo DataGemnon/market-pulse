@@ -1,14 +1,9 @@
 'use server';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { StockQuote } from '@/types';
+import { StockQuote, PersonalImpactResult } from '@/types';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-export interface PersonalImpactResult {
-    brief: string;
-    severity: 'positive' | 'negative' | 'mixed';
-}
 
 const pct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 

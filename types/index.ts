@@ -168,3 +168,37 @@ export interface MarketCommentary {
   source: string;
   date: string;
 }
+
+export interface SmartNewsResult {
+  symbol: string;
+  summary: string;
+  sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+  articles: NewsArticle[];
+}
+
+export interface StockSearchResult {
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+}
+
+export interface EarningsPreviewResult {
+  symbol: string;
+  name: string;
+  date: string;
+  time: string;
+  preview: string;
+}
+
+export interface PersonalImpactResult {
+  brief: string;
+  severity: 'positive' | 'negative' | 'mixed';
+}
+
+export interface DiscoveryResult {
+  symbol: string;
+  name: string;
+  what: string;
+  fit: string;
+}

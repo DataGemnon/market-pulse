@@ -1,7 +1,7 @@
 'use server';
 
-import { getStockQuote, getBatchQuotes, searchStocks, type StockSearchResult } from '@/lib/fmp';
-import { StockQuote } from '@/types';
+import { getStockQuote, getBatchQuotes, searchStocks } from '@/lib/fmp';
+import { StockQuote, StockSearchResult } from '@/types';
 
 export async function getStockQuoteAction(symbol: string): Promise<StockQuote> {
     return getStockQuote(symbol);
@@ -14,5 +14,3 @@ export async function getBatchQuotesAction(symbols: string[]): Promise<StockQuot
 export async function searchStocksAction(query: string): Promise<StockSearchResult[]> {
     return searchStocks(query);
 }
-
-export type { StockSearchResult };

@@ -1,23 +1,29 @@
-'use server';
-
+import { NextRequest, NextResponse } from 'next/server';
 import { getMarketNews } from '@/lib/fmp';
 import { getEODHDNews, isNonUSSymbol } from '@/lib/eodhd';
 import { summarizeStockNews } from '@/lib/claude';
-import { NewsArticle, SmartNewsResult } from '@/types';
+import type { NewsArticle } from '@/types';
 
-export async function getSmartNewsForStock(symbol: string): Promise<SmartNewsResult | null> {
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+    const { symbol }: { symbol: string } = await req.json();
+    if (!symbol) return NextResponse.json(null);
+
     try {
         const nonUS = isNonUSSymbol(symbol);
 
-        // Route non-US tickers to EODHD (global coverage), US tickers to FMP
+        // Route to EODHD (non-US) or FMP (US)
         const articles: NewsArticle[] = nonUS
             ? await getEODHDNews(symbol, 20)
             : await getMarketNews(20, [symbol]);
 
-        if (!articles || articles.length === 0) return null;
+        if (!articles || articles.length === 0) return NextResponse.json(null);
 
-        // For US stocks: only use articles published today
-        // For non-US stocks: extend to 3 days (European/Asian news is less frequent)
+        // Time windows:
+        //  • US stocks     → today only
+        //  • Non-US stocks → today first, fall back to 7 days
+        //    (small-cap EU stocks publish news infrequently)
         const now = new Date();
         const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -28,13 +34,13 @@ export async function getSmartNewsForStock(symbol: string): Promise<SmartNewsRes
         if (todaysArticles.length > 0) {
             recentArticles = todaysArticles;
         } else if (nonUS) {
-            // Broader window for non-US / small-cap stocks (earnings may be days old)
+            // Broader window for non-US / small-cap stocks
             recentArticles = articles.filter(a => new Date(a.publishedDate) >= sevenDaysAgo);
         } else {
-            return null; // US stock with no news today — skip
+            return NextResponse.json(null);
         }
 
-        if (recentArticles.length === 0) return null;
+        if (recentArticles.length === 0) return NextResponse.json(null);
 
         const articleData = recentArticles.map(a => ({
             title: a.title,
@@ -44,12 +50,12 @@ export async function getSmartNewsForStock(symbol: string): Promise<SmartNewsRes
 
         const analysis = await summarizeStockNews(symbol, articleData);
 
-        return {
+        return NextResponse.json({
             ...analysis,
             articles: recentArticles,
-        };
-    } catch (error) {
-        console.error(`Error in getSmartNewsForStock for ${symbol}:`, error);
-        return null;
+        });
+    } catch (err) {
+        console.error(`/api/smart-news error for ${symbol}:`, err);
+        return NextResponse.json(null);
     }
 }

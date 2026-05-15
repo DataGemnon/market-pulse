@@ -1,9 +1,17 @@
 'use server';
 
-import { getAnalystConsensus, getFinnhubRecommendation, getDiscoveryStocks, getRecentRatingChanges } from '@/lib/fmp';
+import { getAnalystConsensus, getFinnhubRecommendation, getRecentRatingChanges } from '@/lib/fmp';
+import { getEODHDAnalystConsensus, isNonUSSymbol } from '@/lib/eodhd';
 import { AnalystConsensus, RatingChange } from '@/types';
 
 async function getConsensusForSymbol(sym: string): Promise<AnalystConsensus[]> {
+    // Non-US stocks: use EODHD (FMP and Finnhub are US-only)
+    if (isNonUSSymbol(sym)) {
+        const result = await getEODHDAnalystConsensus(sym);
+        return result ? [result] : [];
+    }
+
+    // US stocks: try Finnhub first (more data points), fall back to FMP
     const finnhub = await getFinnhubRecommendation(sym);
     if (finnhub.length >= 2) return finnhub;
     const fmp = await getAnalystConsensus(sym);

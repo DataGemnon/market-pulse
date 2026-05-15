@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, RefreshCw } from 'lucide-react';
 
 interface BriefResponse {
     brief: string | null;
@@ -30,12 +30,10 @@ export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) 
     // Store the calendar date we last fetched so we re-fetch on a new day
     const fetchedDate = useRef<string | null>(null);
 
-    useEffect(() => {
+    const load = (force = false) => {
         if (!enabled || watchlist.length === 0) return;
-
-        const today = new Date().toDateString(); // e.g. "Mon May 05 2026"
-        if (fetchedDate.current === today) return; // already fetched today
-
+        const today = new Date().toDateString();
+        if (!force && fetchedDate.current === today) return;
         fetchedDate.current = today;
         setLoading(true);
         fetchBrief(watchlist)
@@ -45,7 +43,9 @@ export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) 
             })
             .catch(() => setBrief(null))
             .finally(() => setLoading(false));
-    }, [enabled, watchlist]);
+    };
+
+    useEffect(() => { load(); }, [enabled, watchlist]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!enabled) return null;
 
@@ -67,6 +67,15 @@ export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) 
                         <span className="text-[10px] text-slate-600">
                             {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
                         </span>
+                        {!isSunday && !loading && (
+                            <button
+                                onClick={() => load(true)}
+                                className="ml-auto p-1 rounded-md text-slate-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                                title="Refresh brief"
+                            >
+                                <RefreshCw size={11} />
+                            </button>
+                        )}
                     </div>
 
                     {isSunday && (

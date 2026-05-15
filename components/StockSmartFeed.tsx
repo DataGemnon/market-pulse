@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import type { SmartNewsResult } from '@/types';
-import { getSmartNewsForStock } from '@/actions/ai-news';
 import { Loader2, ChevronDown, ChevronUp, ExternalLink, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -48,7 +47,12 @@ function StockNewsSummaryCard({ symbol }: { symbol: string }) {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const result = await getSmartNewsForStock(symbol);
+                const res = await fetch('/api/smart-news', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol }),
+                });
+                const result: SmartNewsResult | null = res.ok ? await res.json() : null;
                 if (mounted) setData(result);
             } catch (error) {
                 console.error(error);

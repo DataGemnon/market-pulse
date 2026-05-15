@@ -79,35 +79,68 @@ export interface MarketImpactAnalysis {
     }[];
 }
 
-export async function analyzeMarketImpact(news: GeneralNewsArticle[], events: EconomicEvent[]): Promise<MarketImpactAnalysis> {
+export async function analyzeMarketImpact(
+    news: GeneralNewsArticle[],
+    events: EconomicEvent[],
+    extraArticles: { title: string; body: string }[] = []
+): Promise<MarketImpactAnalysis> {
     const highImpactEvents = events.filter(e => e.impact === 'High' || e.impact === 'Medium').slice(0, 5);
-    const recentNews = news.slice(0, 10);
 
     const eventsText = highImpactEvents.length > 0
-        ? highImpactEvents.map(e => `- [${e.country}] ${e.event}: Actual=${e.actual ?? 'N/A'}, Est=${e.estimate ?? 'N/A'}, Impact=${e.impact}`).join('\n')
-        : '- No high-impact events today';
+        ? highImpactEvents.map(e => {
+            const unit = e.unit || '';
+            if (e.actual !== null && e.estimate !== null) {
+                const beat = (e.actual as number) > (e.estimate as number) ? 'BEAT' : 'MISSED';
+                return `[${e.impact.toUpperCase()}] ${e.event}: Actual ${e.actual}${unit} vs Expected ${e.estimate}${unit} — ${beat}`;
+            }
+            return `[${e.impact.toUpperCase()}] ${e.event}${e.actual !== null ? `: ${e.actual}${unit}` : ' — upcoming'}`;
+          }).join('\n')
+        : 'No major economic releases today';
 
-    const newsText = recentNews.length > 0
-        ? recentNews.map(n => `- ${n.title}`).join('\n')
-        : '- No headlines available';
+    // Build article feed: FMP news WITH full text content + any extra articles (RSS etc.)
+    const allArticles = [
+        ...news.slice(0, 15).map(n => ({ title: n.title, body: (n.text || '').replace(/<[^>]+>/g, '').trim().slice(0, 350), source: n.site })),
+        ...extraArticles.slice(0, 8).map(a => ({ ...a, source: 'Yahoo Finance' })),
+    ];
+    const articlesText = allArticles
+        .filter(a => a.title)
+        .map((a, i) => `[${i + 1}] ${a.source.toUpperCase()}\n${a.title}\n${a.body || '(no excerpt)'}`)
+        .join('\n\n');
 
-    const prompt = `You are a senior Wall Street strategist. Analyze the market data below and identify the single dominant narrative driving markets today.
+    const prompt = `You are explaining today's financial markets to someone who never reads financial news.
 
-ECONOMIC EVENTS:
+Your job: read the articles below and identify 2-3 REAL, CONCRETE news stories driving markets today.
+
+✅ GOOD examples of what you should write:
+- title: "Trump visit to China disappoints investors", description: "Investors hoped for a trade deal but no agreement was reached, keeping tariff uncertainty high."
+- title: "Inflation stays stubbornly high", description: "US prices rose more than expected, making it less likely the Fed will cut interest rates soon."
+- title: "Fed Chair signals no rate cuts", description: "Jerome Powell said the central bank needs more proof inflation is falling before lowering rates."
+- title: "Strong jobs data boosts confidence", description: "More Americans found work than expected, suggesting the economy is holding up well."
+
+❌ BAD examples — never write like this:
+- "Small-cap to large-cap valuation gap closure"
+- "Market breadth concerns and mega-cap rotation"
+- "Equity risk premium compression"
+- "Mixed performance across equity indices"
+
+ECONOMIC DATA RELEASED TODAY:
 ${eventsText}
 
-NEWS HEADLINES:
-${newsText}
+NEWS ARTICLES (read these to find the real story):
+${articlesText}
 
-Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation. Use this exact structure:
-{"summary":"One punchy sentence describing the main market driver today.","market_sentiment":"BULLISH","key_drivers":[{"title":"Main narrative title","impact_level":"HIGH","category":"ECONOMY","description":"Why this is the top story."},{"title":"Supporting factor","impact_level":"MEDIUM","category":"MARKET","description":"Brief explanation."}]}
+Respond with ONLY valid JSON, no markdown:
+{"summary":"One plain sentence naming the biggest story today (max 20 words).","market_sentiment":"BEARISH","key_drivers":[{"title":"Short plain-English title (max 8 words)","impact_level":"HIGH","category":"POLICY","description":"One sentence explaining what happened and why it matters, in plain English. Max 25 words."},{"title":"Second story title","impact_level":"MEDIUM","category":"ECONOMY","description":"Plain explanation."}]}
 
 Rules:
-- market_sentiment must be exactly one of: BULLISH, BEARISH, NEUTRAL
-- impact_level must be exactly one of: HIGH, MEDIUM, LOW
-- category must be exactly one of: GEOPOLITICS, ECONOMY, POLICY, MARKET
-- Include 2 to 3 key_drivers
-- Output raw JSON only, nothing else`;
+- market_sentiment: BULLISH, BEARISH, or NEUTRAL
+- impact_level: HIGH, MEDIUM, or LOW
+- category: GEOPOLITICS, ECONOMY, POLICY, or MARKET
+- 2 to 3 key_drivers
+- No ETF ticker names (QQQ, SPY, TLT…) — say "Nasdaq", "S&P 500", "bond market"
+- No financial jargon — write as if talking to a friend
+- Titles must name the actual event, not an abstract concept
+- Raw JSON only`;
 
     try {
         const msg = await getClient().messages.create({

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 
-import { getMarketImpactAction } from '@/actions/market-impact';
 import { MarketImpactAnalysis } from '@/lib/claude';
 import { Loader2, TrendingUp, TrendingDown, Minus, Globe, AlertTriangle, Building2, Activity } from 'lucide-react';
 
@@ -12,23 +11,14 @@ export default function MarketImpactFeed() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function fetchData() {
-            try {
-                const result = await getMarketImpactAction();
-                if (result) {
-                    setAnalysis(result);
-                } else {
-                    setError('Unable to analyze market impact.');
-                }
-            } catch (err) {
-                console.error('Failed to fetch market impact data:', err);
+        fetch('/api/market-impact')
+            .then(res => res.ok ? res.json() : Promise.reject(res.status))
+            .then((data: MarketImpactAnalysis) => setAnalysis(data))
+            .catch(err => {
+                console.error('Failed to fetch market impact:', err);
                 setError('Unable to load market impact analysis.');
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchData();
+            })
+            .finally(() => setLoading(false));
     }, []);
 
     if (loading) {

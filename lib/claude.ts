@@ -37,7 +37,10 @@ ${articlesText}
 Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation:
 {"summary":"One concise sentence (max 20 words) describing the main story.","sentiment":"POSITIVE"}
 
-sentiment must be exactly one of: POSITIVE, NEUTRAL, NEGATIVE`;
+Rules:
+- sentiment must be exactly one of: POSITIVE, NEUTRAL, NEGATIVE
+- Do not mention ETF ticker symbols (QQQ, SPY, TLT, GLD, etc.) — say "Nasdaq", "S&P 500", "bond market", "gold" instead
+- Write for a beginner investor, plain English only`;
 
     try {
         const msg = await getClient().messages.create({

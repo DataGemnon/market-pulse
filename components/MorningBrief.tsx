@@ -6,6 +6,7 @@ import { Sun, Moon, RefreshCw } from 'lucide-react';
 interface BriefResponse {
     brief: string | null;
     sunday?: boolean;
+    generatedAt?: string;
 }
 
 async function fetchBrief(watchlist: string[]): Promise<BriefResponse> {
@@ -24,9 +25,10 @@ interface MorningBriefProps {
 }
 
 export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) {
-    const [brief, setBrief]       = useState<string | null>(null);
-    const [loading, setLoading]   = useState(false);
-    const [isSunday, setIsSunday] = useState(false);
+    const [brief, setBrief]         = useState<string | null>(null);
+    const [loading, setLoading]     = useState(false);
+    const [isSunday, setIsSunday]   = useState(false);
+    const [generatedAt, setGeneratedAt] = useState<string | null>(null);
     // Store the calendar date we last fetched so we re-fetch on a new day
     const fetchedDate = useRef<string | null>(null);
 
@@ -40,6 +42,7 @@ export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) 
             .then(data => {
                 setIsSunday(data.sunday ?? false);
                 setBrief(data.brief ?? null);
+                setGeneratedAt(data.generatedAt ?? null);
             })
             .catch(() => setBrief(null))
             .finally(() => setLoading(false));
@@ -67,6 +70,11 @@ export default function MorningBrief({ watchlist, enabled }: MorningBriefProps) 
                         <span className="text-[10px] text-slate-600">
                             {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
                         </span>
+                        {generatedAt && (
+                            <span className="text-[10px] text-slate-700">
+                                · updated {new Date(generatedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
                         {!isSunday && !loading && (
                             <button
                                 onClick={() => load(true)}

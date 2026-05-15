@@ -106,52 +106,51 @@ async function getMacroSnapshot(): Promise<string> {
     return lines.filter(Boolean).join(' | ') || 'unavailable';
 }
 
+// ETF tickers to strip from article content before sending to Claude
+// so the brief never says "QQQ fell" — it should say "Nasdaq fell"
+const ETF_TICKER_RE = /\b(QQQ|SPY|IWM|DIA|TLT|GLD|SLV|USO|UUP|XLK|XLF|XLE|XLV|XLY|XLP|XLC|XLI|XLB|XLRE|XLU|VXX|UVXY|SQQQ|TQQQ)\b/g;
+const ETF_LABEL_MAP: Record<string, string> = {
+    QQQ: 'Nasdaq', SPY: 'S&P 500', DIA: 'Dow Jones', IWM: 'small-cap stocks',
+    TLT: 'long-term bonds', GLD: 'gold', USO: 'oil', UUP: 'US dollar',
+};
+function stripEtfTickers(text: string): string {
+    return text.replace(ETF_TICKER_RE, t => ETF_LABEL_MAP[t] ?? t);
+}
+
 // ── Build rich article feed ───────────────────────────────────────────────
-// Each article is sent as TITLE + BODY (not just a headline).
-// This is what lets Claude detect Fed speeches, political events, tariffs, etc.
+// Articles filtered to last 24 hours only — prevents Claude from reading
+// yesterday's bullish articles and generating a brief that contradicts
+// today's actual market direction.
 interface ArticleSummary { source: string; title: string; body: string; }
 
 async function buildArticleFeed(): Promise<ArticleSummary[]> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     const [general, macroBondNews, rss] = await Promise.all([
-        getGeneralNews(20).catch(() => []),
-        getMarketNews(10, ['TLT', 'GLD', 'USO']).catch(() => []),   // bond/commodity angle
+        getGeneralNews(25).catch(() => []),
+        getMarketNews(10, ['TLT', 'GLD', 'USO']).catch(() => []),
         getYahooFinanceRSS(),
     ]);
 
     const articles: ArticleSummary[] = [];
     const seen = new Set<string>();
 
-    // FMP general news — comes with article text already
-    for (const n of general) {
-        const key = n.title.toLowerCase().slice(0, 60);
-        if (seen.has(key)) continue;
+    const add = (source: string, title: string, body: string, date?: string) => {
+        // Drop articles older than 24 h (skip if no date — keep RSS items which have no timestamp here)
+        if (date && new Date(date) < cutoff) return;
+        const key = title.toLowerCase().slice(0, 60);
+        if (seen.has(key) || !title) return;
         seen.add(key);
         articles.push({
-            source: n.site,
-            title:  n.title,
-            body:   (n.text ?? '').replace(/<[^>]+>/g, '').trim().slice(0, 400),
+            source,
+            title:  stripEtfTickers(title),
+            body:   stripEtfTickers((body).replace(/<[^>]+>/g, '').trim().slice(0, 400)),
         });
-    }
+    };
 
-    // FMP macro ETF news (bond / gold / oil stories)
-    for (const n of macroBondNews) {
-        const key = n.title.toLowerCase().slice(0, 60);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        articles.push({
-            source: n.site,
-            title:  n.title,
-            body:   (n.text ?? '').replace(/<[^>]+>/g, '').trim().slice(0, 400),
-        });
-    }
-
-    // Yahoo Finance RSS — best for Fed / political / macro surprise stories
-    for (const r of rss) {
-        const key = r.title.toLowerCase().slice(0, 60);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        articles.push({ source: 'Yahoo Finance', title: r.title, body: r.body });
-    }
+    for (const n of general)      add(n.site,           n.title, n.text  ?? '', n.publishedDate);
+    for (const n of macroBondNews) add(n.site,           n.title, n.text  ?? '', n.publishedDate);
+    for (const r of rss)           add('Yahoo Finance',  r.title, r.body,        undefined); // RSS has no pubDate parsed
 
     return articles.slice(0, 22);
 }
@@ -181,7 +180,13 @@ export async function POST(req: NextRequest) {
         .map(s => `${s.sector}: ${s.changesPercentage >= 0 ? '+' : ''}${s.changesPercentage.toFixed(2)}%`)
         .join(' | ') || 'unavailable';
 
-    // Format articles with full body text — this is the key change
+    // Derive an unambiguous market direction label from the S&P 500 change
+    const spChange = indices.find(i => i.symbol === '^GSPC' || i.name?.includes('S&P'))?.changesPercentage ?? 0;
+    const marketDirection =
+        spChange >  0.5 ? `MARKETS ARE UP TODAY (+${spChange.toFixed(2)}%)` :
+        spChange < -0.5 ? `MARKETS ARE DOWN TODAY (${spChange.toFixed(2)}%)` :
+                          `MARKETS ARE ROUGHLY FLAT TODAY (${spChange.toFixed(2)}%)`;
+
     const articlesText = articles.map((a, i) =>
         `[${i + 1}] ${a.source.toUpperCase()}\nHeadline: ${a.title}\nContent: ${a.body || '(no excerpt)'}`
     ).join('\n\n');
@@ -192,35 +197,31 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are a market analyst writing a brief for a beginner investor.
 
-Read the articles below carefully and identify the SINGLE most important story driving markets right now — it could be anything:
-- A Fed Chair speech or rate decision
-- Inflation data surprise (CPI, PPI)
-- Political event (tariffs, elections, sanctions, geopolitics)
-- Economic data (jobs, GDP, consumer confidence)
-- A major corporate event
-- Rising/falling bond yields and WHY
+⚠️ GROUND TRUTH — TRUST THESE LIVE NUMBERS ABOVE ALL ELSE:
+${marketDirection}
+Full indices: ${indicesText}
+Macro signals: ${macroSnapshot}
+Top moving sectors: ${topSectors}
+Your first sentence MUST be consistent with this direction. If markets are down, do NOT say they rose.
 
-MARKET NUMBERS (context only — articles explain why):
-Indices: ${indicesText}
-Macro: ${macroSnapshot}
-Sectors: ${topSectors}
-User watchlist: ${watchlistText}
-
-ECONOMIC DATA RELEASED TODAY (check for beats/misses — these move markets):
+ECONOMIC DATA RELEASED TODAY:
 ${economicEvents}
 
-NEWS ARTICLES (READ THESE — this is the real story):
+NEWS ARTICLES FROM THE LAST 24 HOURS (read to find WHY markets moved):
 ${articlesText}
 
-Write exactly 3 short sentences for a beginner:
-1. What is the main thing happening in markets today and why? (Be specific — name the event, not just the direction)
-2. Explain it in plain English as if the reader has never invested before
-3. One thing worth watching or knowing about today — ideally linked to their watchlist
+USER'S WATCHLIST: ${watchlistText}
+
+Write exactly 3 short sentences for a beginner investor:
+1. What is happening in markets today and the main reason why — be specific (name the event: Fed speech, inflation data, tariffs, etc.)
+2. Explain why it matters in plain English, as if talking to someone who has never invested
+3. One specific thing worth watching today, ideally linked to their watchlist
 
 Hard rules:
+- The market direction in sentence 1 MUST match the live index numbers above
 - Max 20 words per sentence
-- Zero financial jargon — if you must use a term, explain it in the same sentence
-- No "markets were mixed" without a cause
+- No ETF ticker names (QQQ, SPY, TLT, etc.) — say "Nasdaq", "S&P 500", "bond market" instead
+- No financial jargon without explanation in the same sentence
 - No buy/sell advice
 - Return ONLY the 3 sentences, nothing else`;
 
@@ -232,7 +233,7 @@ Hard rules:
             messages: [{ role: 'user', content: prompt }],
         });
         const text = msg.content[0].type === 'text' ? msg.content[0].text.trim() : null;
-        return NextResponse.json({ brief: text });
+        return NextResponse.json({ brief: text, generatedAt: new Date().toISOString() });
     } catch (err) {
         console.error('morning-brief error:', err);
         return NextResponse.json({ brief: null, error: String(err) });

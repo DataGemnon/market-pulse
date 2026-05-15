@@ -82,7 +82,9 @@ export interface MarketImpactAnalysis {
 export async function analyzeMarketImpact(
     news: GeneralNewsArticle[],
     events: EconomicEvent[],
-    extraArticles: { title: string; body: string }[] = []
+    extraArticles: { title: string; body: string }[] = [],
+    marketDirection = '',
+    indicesText = '',
 ): Promise<MarketImpactAnalysis> {
     const highImpactEvents = events.filter(e => e.impact === 'High' || e.impact === 'Medium').slice(0, 5);
 
@@ -107,7 +109,16 @@ export async function analyzeMarketImpact(
         .map((a, i) => `[${i + 1}] ${a.source.toUpperCase()}\n${a.title}\n${a.body || '(no excerpt)'}`)
         .join('\n\n');
 
+    const groundTruth = marketDirection
+        ? `⚠️ LIVE MARKET DATA — THIS IS GROUND TRUTH, DO NOT CONTRADICT IT:
+${marketDirection}
+Full indices: ${indicesText}
+Your summary and market_sentiment MUST match this direction. If markets are down, do NOT say they hit record highs.`
+        : '';
+
     const prompt = `You are explaining today's financial markets to someone who never reads financial news.
+
+${groundTruth}
 
 Your job: read the articles below and identify 2-3 REAL, CONCRETE news stories driving markets today.
 

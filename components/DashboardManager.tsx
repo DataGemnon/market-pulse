@@ -417,11 +417,28 @@ export default function DashboardManager() {
 
             if (!notifiedAlertIds.current.has(alert.id)) {
                 notifiedAlertIds.current.add(alert.id);
+                // Browser push notification
                 sendNotification({
                     title: `${q.symbol} price alert`,
                     body: `${q.name} ${alert.type === 'above' ? 'rose above' : 'fell below'} ${formatCurrency(alert.price, q.currency)} (now ${formatCurrency(q.price, q.currency)})`,
                     tag: alert.id,
                 });
+                // Email notification (authenticated users only)
+                if (user?.email) {
+                    fetch('/api/send-alert-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: user.email,
+                            symbol: q.symbol,
+                            name: q.name,
+                            type: alert.type,
+                            targetPrice: alert.price,
+                            currentPrice: q.price,
+                            currency: q.currency || 'USD',
+                        }),
+                    }).catch(err => console.error('Email alert failed:', err));
+                }
             }
 
             return triggered;

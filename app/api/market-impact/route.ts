@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { unstable_cache } from 'next/cache';
+import { guardAiRoute } from '@/lib/rate-limit';
 import { getGeneralNews, getEconomicCalendar, getMarketIndices } from '@/lib/fmp';
-import { analyzeMarketImpact } from '@/lib/claude';
+import { analyzeMarketImpact, type MarketImpactAnalysis } from '@/lib/claude';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +26,8 @@ async function getYahooRSS(): Promise<{ title: string; body: string }[]> {
     } catch { return []; }
 }
 
-export async function GET() {
-    try {
+async function computeMarketImpact(): Promise<MarketImpactAnalysis> {
+    {
         const now       = new Date();
         const cutoff24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const yesterday = cutoff24h.toISOString().split('T')[0];
@@ -67,7 +69,19 @@ export async function GET() {
             indicesText,
         );
 
-        return NextResponse.json(analysis);
+        return analysis;
+    }
+}
+
+// Same analysis for every visitor: compute at most once every 15 minutes
+const getCachedMarketImpact = unstable_cache(computeMarketImpact, ['market-impact'], { revalidate: 900 });
+
+export async function GET(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'market-impact', anonPerHour: 30, userPerHour: 60 });
+    if (limited) return limited;
+
+    try {
+        return NextResponse.json(await getCachedMarketImpact());
     } catch (err) {
         console.error('market-impact route error:', err);
         return NextResponse.json({ error: 'Failed to analyze market' }, { status: 500 });

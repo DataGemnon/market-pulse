@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const dynamic = 'force-dynamic';
@@ -6,8 +7,12 @@ export const dynamic = 'force-dynamic';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'discover', anonPerHour: 10, userPerHour: 30 });
+    if (limited) return limited;
+
     const { query } = await req.json();
-    if (!query?.trim()) return NextResponse.json([]);
+    if (typeof query !== 'string' || !query.trim()) return NextResponse.json([]);
+    if (query.length > 100) return NextResponse.json({ error: 'Query too long' }, { status: 400 });
 
     const prompt = `A beginner investor wants to invest in: "${query.trim()}"
 

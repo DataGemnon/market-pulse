@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'ai-summary', anonPerHour: 20, userPerHour: 60 });
+    if (limited) return limited;
+
     try {
         const { news } = await req.json();
         if (!news || !Array.isArray(news) || news.length === 0) {
@@ -12,7 +16,7 @@ export async function POST(req: NextRequest) {
 
         // Pass title + article text (not just the headline)
         const newsText = news.slice(0, 15).map((n: any, i: number) =>
-            `[${i + 1}] ${n.title}\n${(n.text || '').replace(/<[^>]+>/g, '').trim().slice(0, 300)}`
+            `[${i + 1}] ${String(n.title ?? '').slice(0, 200)}\n${(n.text || '').replace(/<[^>]+>/g, '').trim().slice(0, 300)}`
         ).join('\n\n');
 
         const prompt = `Read these news articles and identify the 3 most important things moving markets for a user's watchlist today.

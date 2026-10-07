@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { getGeneralNews, getMarketNews, getSectorPerformance, getMarketIndices, getEconomicCalendar } from '@/lib/fmp';
 
@@ -158,6 +159,9 @@ async function buildArticleFeed(): Promise<ArticleSummary[]> {
 // ─────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'morning-brief', anonPerHour: 10, userPerHour: 30 });
+    if (limited) return limited;
+
     if (new Date().getDay() === 0) return NextResponse.json({ brief: null, sunday: true });
 
     const { watchlist } = await req.json();
@@ -192,7 +196,7 @@ export async function POST(req: NextRequest) {
     ).join('\n\n');
 
     const watchlistText = Array.isArray(watchlist) && watchlist.length > 0
-        ? watchlist.join(', ')
+        ? watchlist.slice(0, 30).map(s => String(s).slice(0, 15)).join(', ')
         : 'none';
 
     const prompt = `You are a market analyst writing a brief for a beginner investor.

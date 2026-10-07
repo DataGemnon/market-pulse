@@ -10,8 +10,7 @@ import { StockQuote, NewsArticle, WatchlistItem, AnalystConsensus, RatingChange,
 import type { EarningsPreviewResult, PersonalImpactResult } from '@/types';
 
 // ── Data actions (server actions — non-AI, proven reliable) ───────────────
-import { getMarketNews } from '@/lib/fmp';
-import { getStockQuoteAction, getBatchQuotesAction } from '@/actions/quotes';
+import { getStockQuoteAction, getBatchQuotesAction, getMarketNewsAction } from '@/actions/quotes';
 import { getWatchlistConsensusAction, getWatchlistRatingChangesAction } from '@/actions/analyst';
 import { getWatchlistEarningsAction } from '@/actions/earnings';
 import { sendNotification } from '@/lib/notifications';
@@ -221,7 +220,7 @@ export default function DashboardManager() {
         const fetchData = async () => {
             const [batchQuotes, newsResults, consensusRes, ratingChanges, earningsRes] = await Promise.all([
                 getBatchQuotesAction(watchlist).catch(() => [] as StockQuote[]),
-                getMarketNews(50, watchlist).catch(() => [] as NewsArticle[]),
+                getMarketNewsAction(watchlist).catch(() => [] as NewsArticle[]),
                 getWatchlistConsensusAction(watchlist).catch(() => []),
                 getWatchlistRatingChangesAction(watchlist).catch(() => []),
                 getWatchlistEarningsAction(watchlist).catch(() => [] as UpcomingEarnings[]),
@@ -429,11 +428,8 @@ export default function DashboardManager() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            email: user.email,
-                            symbol: q.symbol,
+                            alertId: alert.id,
                             name: q.name,
-                            type: alert.type,
-                            targetPrice: alert.price,
                             currentPrice: q.price,
                             currency: q.currency || 'USD',
                         }),

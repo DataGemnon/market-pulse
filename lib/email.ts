@@ -1,6 +1,12 @@
+import 'server-only';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Created lazily so a missing key fails at send time, not at build time
+let resend: Resend | null = null;
+function getResend(): Resend {
+    resend ??= new Resend(process.env.RESEND_API_KEY);
+    return resend;
+}
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Market Pulse <onboarding@resend.dev>';
 const APP_URL    = process.env.NEXT_PUBLIC_APP_URL || 'https://market-pulse.vercel.app';
@@ -161,7 +167,7 @@ export async function sendPriceAlertEmail(payload: AlertEmailPayload): Promise<v
     const direction = isAbove ? 'rose above' : 'fell below';
     const subject   = `${isAbove ? '📈' : '📉'} ${symbol} ${direction} ${formatPrice(targetPrice, currency)}`;
 
-    await resend.emails.send({
+    await getResend().emails.send({
         from: FROM_EMAIL,
         to,
         subject,

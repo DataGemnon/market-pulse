@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { StockQuote } from '@/types';
 
@@ -16,7 +17,7 @@ async function generateRecap(
     const pct = Math.abs(quote.changesPercentage).toFixed(1);
     const prompt =
         `${quote.name} (${quote.symbol}) is ${direction} ${pct}% today.\n` +
-        `Headlines: ${headlines.slice(0, 3).map(h => `"${h}"`).join('; ')}\n` +
+        `Headlines: ${headlines.slice(0, 3).map(h => `"${String(h).slice(0, 200)}"`).join('; ')}\n` +
         `Write ONE plain-English sentence (max 15 words) explaining why. No jargon, no advice.`;
     const msg = await anthropic.messages.create({
         model: 'claude-haiku-4-5',
@@ -28,6 +29,9 @@ async function generateRecap(
 }
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'stock-recap', anonPerHour: 20, userPerHour: 60 });
+    if (limited) return limited;
+
     const { quotes, newsMap }: { quotes: StockQuote[]; newsMap: Record<string, string[]> } = await req.json();
     if (!Array.isArray(quotes)) return NextResponse.json({});
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { UpcomingEarnings } from '@/types';
 
@@ -33,10 +34,13 @@ async function buildPreview(e: UpcomingEarnings, when: string): Promise<string> 
 }
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'earnings-preview', anonPerHour: 20, userPerHour: 60 });
+    if (limited) return limited;
+
     const { earnings }: { earnings: UpcomingEarnings[] } = await req.json();
     if (!Array.isArray(earnings)) return NextResponse.json([]);
 
-    const upcoming = earnings.filter(e => { const o = dayOffset(e.date); return o === 0 || o === 1; });
+    const upcoming = earnings.filter(e => { const o = dayOffset(e.date); return o === 0 || o === 1; }).slice(0, 10);
     if (upcoming.length === 0) return NextResponse.json([]);
 
     const results = await Promise.all(

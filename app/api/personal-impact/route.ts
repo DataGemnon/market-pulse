@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { StockQuote } from '@/types';
 
@@ -7,8 +8,12 @@ export const dynamic = 'force-dynamic';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
-    const { quotes }: { quotes: StockQuote[] } = await req.json();
-    if (!Array.isArray(quotes) || quotes.length === 0) return NextResponse.json(null);
+    const limited = await guardAiRoute(req, { route: 'personal-impact', anonPerHour: 20, userPerHour: 60 });
+    if (limited) return limited;
+
+    const body: { quotes: StockQuote[] } = await req.json();
+    if (!Array.isArray(body.quotes) || body.quotes.length === 0) return NextResponse.json(null);
+    const quotes = body.quotes.slice(0, 50);
 
     const STOCK_THRESHOLD = 2.5;
     const AVG_THRESHOLD = 0.8;

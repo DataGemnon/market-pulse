@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { AnalystConsensus } from '@/types';
 
@@ -22,6 +23,9 @@ async function summariseOne(c: AnalystConsensus): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'sentiment', anonPerHour: 20, userPerHour: 60 });
+    if (limited) return limited;
+
     const { consensus }: { consensus: AnalystConsensus[] } = await req.json();
     if (!Array.isArray(consensus) || consensus.length === 0) return NextResponse.json({});
 

@@ -1,10 +1,11 @@
+import 'server-only';
 import { StockQuote, MarketIndex, NewsArticle, HistoricalPrice, AnalystRating, EarningsCall, PriceTarget, SectorPerformance, AnalystConsensus, RatingChange, UpcomingEarnings } from '@/types';
 
 const BASE_URL = 'https://financialmodelingprep.com/api/v3';
-const API_KEY = process.env.NEXT_PUBLIC_FMP_API_KEY;
+const API_KEY = process.env.FMP_API_KEY;
 
 if (!API_KEY) {
-    console.warn('FMP API Key is missing. Please set NEXT_PUBLIC_FMP_API_KEY in .env.local');
+    console.warn('FMP API Key is missing. Please set FMP_API_KEY in .env.local');
 }
 
 const fetchFMP = async (endpoint: string, params: Record<string, string> = {}) => {

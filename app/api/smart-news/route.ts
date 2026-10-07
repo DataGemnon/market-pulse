@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/rate-limit';
 import { getMarketNews } from '@/lib/fmp';
 import { getEODHDNews, isNonUSSymbol } from '@/lib/eodhd';
 import { summarizeStockNews } from '@/lib/claude';
@@ -7,8 +8,11 @@ import type { NewsArticle } from '@/types';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+    const limited = await guardAiRoute(req, { route: 'smart-news', anonPerHour: 40, userPerHour: 120 });
+    if (limited) return limited;
+
     const { symbol }: { symbol: string } = await req.json();
-    if (!symbol) return NextResponse.json(null);
+    if (typeof symbol !== 'string' || !/^[A-Za-z0-9.^=-]{1,15}$/.test(symbol)) return NextResponse.json(null);
 
     try {
         const nonUS = isNonUSSymbol(symbol);

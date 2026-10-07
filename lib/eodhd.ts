@@ -1,3 +1,4 @@
+import 'server-only';
 /**
  * EODHD (EOD Historical Data) API helper
  * Used for: news, analyst ratings, and stock search for European & Asian markets

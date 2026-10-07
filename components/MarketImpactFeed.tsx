@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { MarketImpactAnalysis } from '@/lib/claude';
+import type { MarketImpactAnalysis } from '@/lib/claude';
 import { Loader2, TrendingUp, TrendingDown, Minus, Globe, AlertTriangle, Building2, Activity } from 'lucide-react';
 
 export default function MarketImpactFeed() {

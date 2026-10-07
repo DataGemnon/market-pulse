@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SectorPerformance } from '@/types';
-import { getSectorPerformance } from '@/lib/fmp';
+import { getSectorPerformanceAction } from '@/actions/quotes';
 import { LayoutGrid, TrendingUp, TrendingDown } from 'lucide-react';
 
 // Map each FMP sector name to a relevant Unsplash image
@@ -30,7 +30,7 @@ export default function SectorHeatmap() {
     useEffect(() => {
         const load = async () => {
             try {
-                const data = await getSectorPerformance();
+                const data = await getSectorPerformanceAction();
                 setSectors(data);
             } catch (e) {
                 console.error('Failed to load sector data', e);

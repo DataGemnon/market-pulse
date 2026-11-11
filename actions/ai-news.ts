@@ -1,6 +1,5 @@
 'use server';
 
-import { getMarketNews } from '@/lib/fmp';
 import { getEODHDNews, isNonUSSymbol } from '@/lib/eodhd';
 import { summarizeStockNews } from '@/lib/claude';
 import { NewsArticle, SmartNewsResult } from '@/types';
@@ -9,10 +8,7 @@ export async function getSmartNewsForStock(symbol: string): Promise<SmartNewsRes
     try {
         const nonUS = isNonUSSymbol(symbol);
 
-        // Route non-US tickers to EODHD (global coverage), US tickers to FMP
-        const articles: NewsArticle[] = nonUS
-            ? await getEODHDNews(symbol, 20)
-            : await getMarketNews(20, [symbol]);
+        const articles: NewsArticle[] = await getEODHDNews(symbol, 20);
 
         if (!articles || articles.length === 0) return null;
 

@@ -10,7 +10,7 @@ import SectorHeatmap from '@/components/SectorHeatmap';
 import MarketCommentaryFeed from '@/components/MarketCommentaryFeed';
 import AnalystDiscovery from '@/components/AnalystDiscovery';
 import InternationalIndices from '@/components/InternationalIndices';
-import { getMarketIndices } from '@/lib/fmp';
+import { getMarketIndices } from '@/lib/market-data';
 
 export default async function Home() {
   const indices = await getMarketIndices();

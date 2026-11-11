@@ -100,7 +100,7 @@ export async function analyzeMarketImpact(
           }).join('\n')
         : 'No major economic releases today';
 
-    // Build article feed: FMP news WITH full text content + any extra articles (RSS etc.)
+    // Build article feed: provider news WITH full text content + any extra articles (RSS etc.)
     const allArticles = [
         ...news.slice(0, 15).map(n => ({ title: n.title, body: (n.text || '').replace(/<[^>]+>/g, '').trim().slice(0, 350), source: n.site })),
         ...extraArticles.slice(0, 8).map(a => ({ ...a, source: 'Yahoo Finance' })),

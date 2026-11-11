@@ -1,7 +1,7 @@
 'use server';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getMarketIndices, getGeneralNews, getSectorPerformance } from '@/lib/fmp';
+import { getMarketIndices, getGeneralNews, getSectorPerformance } from '@/lib/market-data';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

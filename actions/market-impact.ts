@@ -1,13 +1,13 @@
 'use server';
 
-import { getGeneralNews, getEconomicCalendar } from '@/lib/fmp';
+import { getGeneralNews, getEconomicCalendar } from '@/lib/market-data';
 import { analyzeMarketImpact, MarketImpactAnalysis } from '@/lib/claude';
 
 export async function getMarketImpactAction(): Promise<MarketImpactAnalysis | null> {
     try {
         const today = new Date().toISOString().split('T')[0];
 
-        // Fetch data sequentially to avoid FMP rate limiting
+        // Fetch data sequentially to spread out API calls
         const news = await getGeneralNews(15).catch(() => []);
         await new Promise(r => setTimeout(r, 250)); // small delay
         const calendar = await getEconomicCalendar(today, today).catch(() => []);

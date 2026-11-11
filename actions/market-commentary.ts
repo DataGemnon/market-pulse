@@ -1,7 +1,7 @@
 'use server';
 
 import { unstable_cache } from 'next/cache';
-import { getGeneralNews } from '@/lib/fmp';
+import { getGeneralNews } from '@/lib/market-data';
 import { extractMarketCommentary } from '@/lib/claude';
 import { MarketCommentary } from '@/types';
 

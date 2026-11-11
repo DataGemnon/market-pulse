@@ -1,7 +1,8 @@
 import 'server-only';
 /**
  * EODHD (EOD Historical Data) API helper
- * Used for: news, analyst ratings, and stock search for European & Asian markets
+ * Primary market data provider for all markets (US, Europe, Asia):
+ * quotes, end-of-day history, news, search and analyst consensus.
  * API key: EODHD_API_KEY (server-side only — never expose client-side)
  */
 
@@ -36,6 +37,19 @@ function toEODHDSymbol(symbol: string): string {
     // .SS (Shanghai), .MC (Madrid) are identical in both Yahoo & EODHD.
 }
 
+const CRYPTO_SYMBOL = /^[A-Z]{2,6}-USD$/i;
+
+/**
+ * Convert any app symbol (Yahoo style) to an EODHD ticker:
+ *   AAPL → AAPL.US, ^GSPC → GSPC.INDX, BTC-USD → BTC-USD.CC, MC.PA → MC.PA
+ */
+export function toEODHDTicker(symbol: string): string {
+    if (symbol.startsWith('^')) return `${symbol.slice(1)}.INDX`;
+    if (CRYPTO_SYMBOL.test(symbol)) return `${symbol.toUpperCase()}.CC`;
+    if (isNonUSSymbol(symbol)) return toEODHDSymbol(symbol);
+    return `${symbol}.US`;
+}
+
 /**
  * Convert EODHD exchange codes back to Yahoo Finance-style suffixes.
  * Used so that symbols returned by EODHD search can be stored in the watchlist
@@ -56,17 +70,25 @@ function eohdExchangeToYahooSuffix(exchange: string): string {
 
 // ── Core fetch helper ─────────────────────────────────────────────────────
 
-async function fetchEODHD<T = unknown>(
+/**
+ * revalidateSeconds caches identical requests on the server, which keeps
+ * the daily API-call budget under control. 0 disables caching.
+ */
+export async function fetchEODHD<T = unknown>(
     endpoint: string,
-    params: Record<string, string> = {}
+    params: Record<string, string> = {},
+    revalidateSeconds = 0
 ): Promise<T> {
     if (!API_KEY) throw new Error('EODHD_API_KEY environment variable is not set');
     const query = new URLSearchParams({ api_token: API_KEY, fmt: 'json', ...params }).toString();
     const url = `${BASE_URL}${endpoint}?${query}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const cacheOptions: RequestInit = revalidateSeconds > 0
+        ? { next: { revalidate: revalidateSeconds } }
+        : { cache: 'no-store' };
+    const res = await fetch(url, cacheOptions);
     if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`EODHD API Error ${res.status}: ${body}`);
+        // Never log the response body: EODHD error pages echo the request URL, api_token included
+        throw new Error(`EODHD API Error ${res.status} on ${endpoint}`);
     }
     return res.json() as Promise<T>;
 }
@@ -74,17 +96,15 @@ async function fetchEODHD<T = unknown>(
 // ── News ──────────────────────────────────────────────────────────────────
 
 /**
- * Fetch recent news for a non-US stock ticker.
- * Returns articles formatted as NewsArticle[] (same shape as FMP news).
+ * Fetch recent news for any stock ticker (US or non-US).
  */
 export async function getEODHDNews(symbol: string, limit = 20): Promise<NewsArticle[]> {
     try {
-        const eoSymbol = toEODHDSymbol(symbol);
         const data = await fetchEODHD<any[]>('/news', {
-            s: eoSymbol,
+            s: toEODHDTicker(symbol),
             limit: String(limit),
             offset: '0',
-        });
+        }, 300);
         if (!Array.isArray(data)) return [];
 
         return data.map((item: any): NewsArticle => {
@@ -111,30 +131,27 @@ export async function getEODHDNews(symbol: string, limit = 20): Promise<NewsArti
 // ── Analyst Consensus ─────────────────────────────────────────────────────
 
 /**
- * Fetch analyst buy/hold/sell consensus for a non-US stock.
+ * Fetch analyst buy/hold/sell consensus (needs an EODHD plan with fundamentals).
  * Returns a single AnalystConsensus or null if unavailable.
  */
 export async function getEODHDAnalystConsensus(symbol: string): Promise<AnalystConsensus | null> {
     try {
-        const eoSymbol = toEODHDSymbol(symbol);
-        const data = await fetchEODHD<any>(`/analyst-ratings/${eoSymbol}`);
+        // AnalystRatings lives in the fundamentals feed; plans without fundamentals get a 403
+        const data = await fetchEODHD<any>(`/fundamentals/${toEODHDTicker(symbol)}`, { filter: 'AnalystRatings' }, 86400);
         if (!data || typeof data !== 'object') return null;
 
-        // Handle both flat shape and nested { rating: { ... } } shape
-        const r = data.rating ?? data;
-
-        const strongBuy  = r.strongBuy   ?? r.strong_buy   ?? 0;
-        const buy        = r.buy         ?? 0;
-        const hold       = r.hold        ?? r.neutral      ?? 0;
-        const sell       = r.sell        ?? 0;
-        const strongSell = r.strongSell  ?? r.strong_sell  ?? 0;
+        const strongBuy  = data.StrongBuy  ?? 0;
+        const buy        = data.Buy        ?? 0;
+        const hold       = data.Hold       ?? 0;
+        const sell       = data.Sell       ?? 0;
+        const strongSell = data.StrongSell ?? 0;
 
         // Return null if all counts are zero (no meaningful data)
         if (strongBuy + buy + hold + sell + strongSell === 0) return null;
 
         return {
             symbol,
-            date: (data.date ?? r.date ?? new Date().toISOString().split('T')[0]) as string,
+            date: new Date().toISOString().split('T')[0],
             strongBuy,
             buy,
             hold,

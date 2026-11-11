@@ -5,7 +5,7 @@ import { SectorPerformance } from '@/types';
 import { getSectorPerformanceAction } from '@/actions/quotes';
 import { LayoutGrid, TrendingUp, TrendingDown } from 'lucide-react';
 
-// Map each FMP sector name to a relevant Unsplash image
+// Map each sector name to a relevant Unsplash image
 const SECTOR_IMAGES: Record<string, string> = {
     'Information Technology': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&h=300&fit=crop&q=80',
     'Health Care': 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=500&h=300&fit=crop&q=80',

@@ -1,8 +1,7 @@
 import 'server-only';
 /**
- * Market data facade. EODHD is the primary provider for every market;
- * Yahoo Finance is only a fallback (and the source of intraday charts,
- * which the EODHD Historian plan does not include).
+ * Market data facade. EODHD (Active Trader plan) is the provider for every
+ * market, intraday charts included; Yahoo Finance is only a fallback.
  *
  * Features that need an EODHD plan above Historian (corporate calendar,
  * economic events) degrade to empty results instead of failing.
@@ -196,7 +195,8 @@ const US_INDICES: { symbol: string; name: string }[] = [
 const INTL_INDICES: { symbol: string; name: string }[] = [
     { symbol: '^FCHI', name: 'CAC 40' },
     { symbol: '^GDAXI', name: 'DAX' },
-    { symbol: '^FTSE', name: 'FTSE 100' },
+    // FTSE 100 is not licensed on EODHD (quotes come back "NA"); Euro Stoxx 50 is
+    { symbol: '^STOXX50E', name: 'Euro Stoxx 50' },
     { symbol: '^N225', name: 'Nikkei 225' },
     { symbol: '^HSI', name: 'Hang Seng Index' },
 ];
@@ -264,12 +264,39 @@ async function getEodHistory(symbol: string, days: number | null): Promise<Histo
 
 const EOD_RANGE_DAYS: Record<string, number | null> = { '1M': 31, '3M': 92, '1Y': 366, 'ALL': null };
 
-export const getHistoricalChart = async (symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'): Promise<HistoricalPrice[]> => {
-    // Intraday bars are not part of the EODHD Historian plan
-    if (range === '1D' || range === '1W') return getYahooHistorical(symbol, range);
+type IntradayBar = { timestamp: number; close: number | null };
 
+const INTRADAY_RANGES: Record<'1D' | '1W', { interval: string; lookbackDays: number; keepDays: number }> = {
+    // Look back a few days so weekends and holidays still show the last session
+    '1D': { interval: '5m', lookbackDays: 5, keepDays: 1 },
+    '1W': { interval: '1h', lookbackDays: 10, keepDays: 7 },
+};
+
+async function getIntradayHistory(symbol: string, range: '1D' | '1W'): Promise<HistoricalPrice[]> {
+    const { interval, lookbackDays, keepDays } = INTRADAY_RANGES[range];
+    const from = Math.floor(Date.now() / 1000) - lookbackDays * 24 * 60 * 60;
+    const data = await fetchEODHD<IntradayBar[]>(
+        `/intraday/${toEODHDTicker(symbol)}`, { interval, from: String(from) }, QUOTE_CACHE_SECONDS * 5
+    );
+    if (!Array.isArray(data)) return [];
+    const bars = data.filter(bar => typeof bar.close === 'number');
+    if (bars.length === 0) return [];
+
+    // 1D = last trading session only; 1W = the last 7 calendar days of bars
+    const last = bars[bars.length - 1].timestamp;
+    const cutoff = range === '1D'
+        ? new Date(new Date(last * 1000).toISOString().split('T')[0]).getTime() / 1000
+        : last - keepDays * 24 * 60 * 60;
+    return bars
+        .filter(bar => bar.timestamp >= cutoff)
+        .map(bar => ({ date: new Date(bar.timestamp * 1000).toISOString(), close: bar.close as number }));
+}
+
+export const getHistoricalChart = async (symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'): Promise<HistoricalPrice[]> => {
     try {
-        const prices = await getEodHistory(symbol, EOD_RANGE_DAYS[range]);
+        const prices = range === '1D' || range === '1W'
+            ? await getIntradayHistory(symbol, range)
+            : await getEodHistory(symbol, EOD_RANGE_DAYS[range]);
         if (prices.length > 0) return prices;
     } catch (error) {
         console.error(`EODHD history failed for ${symbol}, trying Yahoo:`, error);

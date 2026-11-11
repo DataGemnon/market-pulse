@@ -60,6 +60,7 @@ function formatCurrency(value: number, currency?: string): string {
     return `${sym}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+const QUOTE_REFRESH_MS = 60_000;
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL'];
 const LS_WATCHLIST = 'augur-watchlist';
 const LS_POSITIONS = 'augur-positions';
@@ -210,6 +211,20 @@ export default function DashboardManager() {
 
         return () => subscription.unsubscribe();
     }, [readLocalStorage]);
+
+    // ──────────────────────────────────────────────────
+    // Refresh quotes every minute: price alerts are checked on each refresh
+    // ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (watchlist.length === 0) return;
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            getBatchQuotesAction(watchlist)
+                .then(fresh => { if (fresh.length > 0) setQuotes(fresh); })
+                .catch(() => {});
+        }, QUOTE_REFRESH_MS);
+        return () => clearInterval(interval);
+    }, [watchlist]);
 
     // ──────────────────────────────────────────────────
     // Fetch market data when watchlist changes

@@ -16,9 +16,9 @@ const INDEX_CONFIG: Record<string, { label: string; flag: string; image: string 
         flag: '🇩🇪',
         image: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=500&h=300&fit=crop&q=80',
     },
-    '^FTSE': {
-        label: 'FTSE 100',
-        flag: '🇬🇧',
+    '^STOXX50E': {
+        label: 'Euro Stoxx 50',
+        flag: '🇪🇺',
         image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=500&h=300&fit=crop&q=80',
     },
     '^N225': {

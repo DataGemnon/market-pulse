@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
 import { guardAiRoute } from '@/lib/rate-limit';
-import { getGeneralNews, getEconomicCalendar, getMarketIndices } from '@/lib/fmp';
+import { getGeneralNews, getEconomicCalendar, getMarketIndices } from '@/lib/market-data';
 import { analyzeMarketImpact, type MarketImpactAnalysis } from '@/lib/claude';
 
 export const dynamic = 'force-dynamic';
 
-// Yahoo Finance RSS — captures Fed/political stories that FMP misses
+// Yahoo Finance RSS — captures Fed/political stories that ticker news misses
 async function getYahooRSS(): Promise<{ title: string; body: string }[]> {
     try {
         const res = await fetch('https://finance.yahoo.com/news/rssindex', {

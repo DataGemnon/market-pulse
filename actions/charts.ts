@@ -1,6 +1,6 @@
 'use server';
 
-import { getHistoricalChart, getSparklineData } from '@/lib/fmp';
+import { getHistoricalChart, getSparklineData } from '@/lib/market-data';
 import { HistoricalPrice } from '@/types';
 
 export async function getChartDataAction(

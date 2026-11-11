@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
-import { getGeneralNews, getMarketNews, getSectorPerformance, getMarketIndices, getEconomicCalendar } from '@/lib/fmp';
+import { getGeneralNews, getMarketNews, getSectorPerformance, getMarketIndices, getEconomicCalendar } from '@/lib/market-data';
 
 export const dynamic = 'force-dynamic';
 

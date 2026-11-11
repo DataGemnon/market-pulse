@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/rate-limit';
-import { getMarketNews } from '@/lib/fmp';
 import { getEODHDNews, isNonUSSymbol } from '@/lib/eodhd';
 import { summarizeStockNews } from '@/lib/claude';
 import type { NewsArticle } from '@/types';
@@ -17,10 +16,7 @@ export async function POST(req: NextRequest) {
     try {
         const nonUS = isNonUSSymbol(symbol);
 
-        // Route to EODHD (non-US) or FMP (US)
-        const articles: NewsArticle[] = nonUS
-            ? await getEODHDNews(symbol, 20)
-            : await getMarketNews(20, [symbol]);
+        const articles: NewsArticle[] = await getEODHDNews(symbol, 20);
 
         if (!articles || articles.length === 0) return NextResponse.json(null);
 

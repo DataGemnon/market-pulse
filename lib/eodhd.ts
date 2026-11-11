@@ -1,7 +1,8 @@
 import 'server-only';
 /**
  * EODHD (EOD Historical Data) API helper
- * Used for: news, analyst ratings, and stock search for European & Asian markets
+ * Primary market data provider for all markets (US, Europe, Asia):
+ * quotes, end-of-day history, news, search and analyst consensus.
  * API key: EODHD_API_KEY (server-side only — never expose client-side)
  */
 
@@ -36,6 +37,19 @@ function toEODHDSymbol(symbol: string): string {
     // .SS (Shanghai), .MC (Madrid) are identical in both Yahoo & EODHD.
 }
 
+const CRYPTO_SYMBOL = /^[A-Z]{2,6}-USD$/i;
+
+/**
+ * Convert any app symbol (Yahoo style) to an EODHD ticker:
+ *   AAPL → AAPL.US, ^GSPC → GSPC.INDX, BTC-USD → BTC-USD.CC, MC.PA → MC.PA
+ */
+export function toEODHDTicker(symbol: string): string {
+    if (symbol.startsWith('^')) return `${symbol.slice(1)}.INDX`;
+    if (CRYPTO_SYMBOL.test(symbol)) return `${symbol.toUpperCase()}.CC`;
+    if (isNonUSSymbol(symbol)) return toEODHDSymbol(symbol);
+    return `${symbol}.US`;
+}
+
 /**
  * Convert EODHD exchange codes back to Yahoo Finance-style suffixes.
  * Used so that symbols returned by EODHD search can be stored in the watchlist
@@ -56,14 +70,22 @@ function eohdExchangeToYahooSuffix(exchange: string): string {
 
 // ── Core fetch helper ─────────────────────────────────────────────────────
 
-async function fetchEODHD<T = unknown>(
+/**
+ * revalidateSeconds caches identical requests on the server, which keeps
+ * the daily API-call budget under control. 0 disables caching.
+ */
+export async function fetchEODHD<T = unknown>(
     endpoint: string,
-    params: Record<string, string> = {}
+    params: Record<string, string> = {},
+    revalidateSeconds = 0
 ): Promise<T> {
     if (!API_KEY) throw new Error('EODHD_API_KEY environment variable is not set');
     const query = new URLSearchParams({ api_token: API_KEY, fmt: 'json', ...params }).toString();
     const url = `${BASE_URL}${endpoint}?${query}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const cacheOptions: RequestInit = revalidateSeconds > 0
+        ? { next: { revalidate: revalidateSeconds } }
+        : { cache: 'no-store' };
+    const res = await fetch(url, cacheOptions);
     if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error(`EODHD API Error ${res.status}: ${body}`);
@@ -74,17 +96,15 @@ async function fetchEODHD<T = unknown>(
 // ── News ──────────────────────────────────────────────────────────────────
 
 /**
- * Fetch recent news for a non-US stock ticker.
- * Returns articles formatted as NewsArticle[] (same shape as FMP news).
+ * Fetch recent news for any stock ticker (US or non-US).
  */
 export async function getEODHDNews(symbol: string, limit = 20): Promise<NewsArticle[]> {
     try {
-        const eoSymbol = toEODHDSymbol(symbol);
         const data = await fetchEODHD<any[]>('/news', {
-            s: eoSymbol,
+            s: toEODHDTicker(symbol),
             limit: String(limit),
             offset: '0',
-        });
+        }, 300);
         if (!Array.isArray(data)) return [];
 
         return data.map((item: any): NewsArticle => {

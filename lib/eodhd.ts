@@ -87,8 +87,8 @@ export async function fetchEODHD<T = unknown>(
         : { cache: 'no-store' };
     const res = await fetch(url, cacheOptions);
     if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`EODHD API Error ${res.status}: ${body}`);
+        // Never log the response body: EODHD error pages echo the request URL, api_token included
+        throw new Error(`EODHD API Error ${res.status} on ${endpoint}`);
     }
     return res.json() as Promise<T>;
 }
@@ -131,30 +131,27 @@ export async function getEODHDNews(symbol: string, limit = 20): Promise<NewsArti
 // ── Analyst Consensus ─────────────────────────────────────────────────────
 
 /**
- * Fetch analyst buy/hold/sell consensus for a non-US stock.
+ * Fetch analyst buy/hold/sell consensus (needs an EODHD plan with fundamentals).
  * Returns a single AnalystConsensus or null if unavailable.
  */
 export async function getEODHDAnalystConsensus(symbol: string): Promise<AnalystConsensus | null> {
     try {
-        const eoSymbol = toEODHDSymbol(symbol);
-        const data = await fetchEODHD<any>(`/analyst-ratings/${eoSymbol}`);
+        // AnalystRatings lives in the fundamentals feed; plans without fundamentals get a 403
+        const data = await fetchEODHD<any>(`/fundamentals/${toEODHDTicker(symbol)}`, { filter: 'AnalystRatings' }, 86400);
         if (!data || typeof data !== 'object') return null;
 
-        // Handle both flat shape and nested { rating: { ... } } shape
-        const r = data.rating ?? data;
-
-        const strongBuy  = r.strongBuy   ?? r.strong_buy   ?? 0;
-        const buy        = r.buy         ?? 0;
-        const hold       = r.hold        ?? r.neutral      ?? 0;
-        const sell       = r.sell        ?? 0;
-        const strongSell = r.strongSell  ?? r.strong_sell  ?? 0;
+        const strongBuy  = data.StrongBuy  ?? 0;
+        const buy        = data.Buy        ?? 0;
+        const hold       = data.Hold       ?? 0;
+        const sell       = data.Sell       ?? 0;
+        const strongSell = data.StrongSell ?? 0;
 
         // Return null if all counts are zero (no meaningful data)
         if (strongBuy + buy + hold + sell + strongSell === 0) return null;
 
         return {
             symbol,
-            date: (data.date ?? r.date ?? new Date().toISOString().split('T')[0]) as string,
+            date: new Date().toISOString().split('T')[0],
             strongBuy,
             buy,
             hold,

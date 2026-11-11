@@ -68,6 +68,22 @@ function eohdExchangeToYahooSuffix(exchange: string): string {
     }
 }
 
+// Main listings for the app's markets (US + Europe), in display priority.
+// EODHD search otherwise ranks CDRs, Bangkok NVDRs and OTC lines above the home listing.
+const PRIMARY_EXCHANGES = ['US', 'PA', 'XETRA', 'LSE', 'AS', 'MI', 'MC', 'BR', 'SW', 'LS', 'ST', 'CO', 'HE', 'OL', 'VI', 'IR'];
+
+type SearchHit = { Code: string; Exchange: string; Name: string };
+
+// EODHD's isPrimary flag is unreliable (SAP.XETRA false, SAP.F true), so rank
+// by exchange and push depositary receipts and US OTC lines (LVMUY, EADSY) down.
+function exchangeRank(hit: SearchHit): number {
+    const index = PRIMARY_EXCHANGES.indexOf(hit.Exchange.toUpperCase());
+    const base = index === -1 ? PRIMARY_EXCHANGES.length : index;
+    const isDepositary = /\b(ADR|CDR|DRC)\b/i.test(hit.Name);
+    const isUsOtcForeign = hit.Exchange.toUpperCase() === 'US' && /^[A-Z]{4}[FY]$/.test(hit.Code);
+    return isDepositary || isUsOtcForeign ? base + 100 : base;
+}
+
 // ── Core fetch helper ─────────────────────────────────────────────────────
 
 /**
@@ -173,14 +189,20 @@ export async function getEODHDAnalystConsensus(symbol: string): Promise<AnalystC
  */
 export async function searchEODHD(query: string, limit = 8): Promise<StockSearchResult[]> {
     try {
+        // Over-fetch so re-ranking can surface the home listing
         const data = await fetchEODHD<any[]>(`/search/${encodeURIComponent(query)}`, {
-            limit: String(limit),
+            limit: String(Math.max(limit * 2, 15)),
             type: 'stock',
-        });
+        }, 3600);
         if (!Array.isArray(data)) return [];
 
         return data
             .filter((item: any) => item.Code && item.Exchange && item.Name)
+            .map((item: SearchHit, position: number) => ({ item, position }))
+            // Stable sort: EODHD's relevance order is kept within the same exchange rank
+            .sort((a, b) => exchangeRank(a.item) - exchangeRank(b.item) || a.position - b.position)
+            .slice(0, limit)
+            .map(({ item }) => item)
             .map((item: any): StockSearchResult => {
                 const suffix = eohdExchangeToYahooSuffix(item.Exchange);
                 const symbol = suffix ? `${item.Code}.${suffix}` : item.Code;

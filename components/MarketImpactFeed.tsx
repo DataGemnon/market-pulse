@@ -96,7 +96,7 @@ export default function MarketImpactFeed() {
             </div>
 
             <div className="p-3 text-center text-[11px] text-slate-600 border-t border-white/[0.04]">
-                Powered by Claude AI & Financial Modeling Prep
+                Powered by Claude AI & EODHD
             </div>
         </div>
     );

@@ -8,7 +8,7 @@ import DashboardManager from '@/components/DashboardManager';
 import MarketImpactFeed from '@/components/MarketImpactFeed';
 import SectorHeatmap from '@/components/SectorHeatmap';
 import MarketCommentaryFeed from '@/components/MarketCommentaryFeed';
-import AnalystDiscovery from '@/components/AnalystDiscovery';
+import RatingChanges from '@/components/mvp/RatingChanges';
 import InternationalIndices from '@/components/InternationalIndices';
 import { getMarketIndices } from '@/lib/market-data';
 
@@ -60,7 +60,7 @@ export default async function Home() {
             </div>
 
             <div id="analyst" className="mb-16 scroll-mt-20">
-              <AnalystDiscovery />
+              <RatingChanges />
             </div>
 
             <div id="impact" className="mb-12 scroll-mt-20">

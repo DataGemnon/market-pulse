@@ -32,6 +32,9 @@ import Watchlist from '@/components/Watchlist';
 import AnalystFeed from '@/components/AnalystFeed';
 import MarketBriefing from '@/components/MarketBriefing';
 import EarningsCalendar from '@/components/EarningsCalendar';
+import ShockAlerts from '@/components/mvp/ShockAlerts';
+import WatchlistEvents from '@/components/mvp/WatchlistEvents';
+import MacroCards from '@/components/mvp/MacroCards';
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
 import { useMorningBriefPreference } from '@/hooks/useMorningBriefPreference';
@@ -491,6 +494,13 @@ export default function DashboardManager() {
                     <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-500">Your Dashboard</h2>
                     <div className="h-px flex-1 bg-gradient-to-l from-white/10 to-transparent" />
+                </div>
+
+                {/* MVP: market shocks first, then official publications and macro dates */}
+                <ShockAlerts watchlist={watchlist} />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <WatchlistEvents watchlist={watchlist} />
+                    <MacroCards watchlist={watchlist} />
                 </div>
 
                 {/* Triggered Price Alerts */}

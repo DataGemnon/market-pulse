@@ -13,6 +13,7 @@ import {
     RatingChange, UpcomingEarnings, EconomicEvent, GeneralNewsArticle,
 } from '@/types';
 import { fetchEODHD, getEODHDNews, isNonUSSymbol, searchEODHD, toEODHDTicker } from '@/lib/eodhd';
+import { getRatingMoves } from '@/lib/ratings/service';
 
 // EODHD recommends at most 15-20 tickers per real-time request.
 const REALTIME_BATCH_SIZE = 15;
@@ -484,7 +485,27 @@ export const getAnalystRatings = async (_symbol: string, _limit: number = 5): Pr
 
 export const getPriceTargets = async (_symbol: string, _limit: number = 5): Promise<PriceTarget[]> => [];
 
-export const getRecentRatingChanges = async (_symbols?: string[]): Promise<RatingChange[]> => [];
+/** Upgrades and downgrades detected by the "recos qui changent" scan (lib/ratings). */
+export const getRecentRatingChanges = async (symbols?: string[]): Promise<RatingChange[]> => {
+    const wanted = symbols ? new Set(symbols.map(s => s.toUpperCase())) : null;
+    try {
+        const moves = await getRatingMoves();
+        return moves
+            .filter(m => (m.action === 'upgrade' || m.action === 'downgrade') && (!wanted || wanted.has(m.symbol.toUpperCase())))
+            .map(m => ({
+                symbol: m.symbol,
+                companyName: m.name,
+                date: m.publishedAt,
+                gradingCompany: m.broker ?? 'Analyste',
+                previousGrade: m.fromRating ?? '',
+                newGrade: m.toRating ?? '',
+                action: m.action as 'upgrade' | 'downgrade',
+            }));
+    } catch (error) {
+        console.error('rating changes failed:', error);
+        return [];
+    }
+};
 
 export const getAnalystUpgrades = async (): Promise<AnalystRating[]> => [];
 
